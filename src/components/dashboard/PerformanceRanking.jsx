@@ -17,9 +17,9 @@ export default function PerformanceRanking({ sites, onSiteClick }) {
     if (!site) return null;
     const value = deviation(site);
     const size = Math.min(50, Math.abs(value) / scale * 50);
-    return <Box sx={{ position: 'absolute', top: lane === 'bottom' ? 4 : 21, height: 12, left: value < 0 ? `${50 - size}%` : '50%', width: `${size}%`, bgcolor: value < 0 ? COLORS.bad : COLORS.good, borderRadius: 0.5, minWidth: value ? 2 : 0 }} />;
+    return <Box sx={{ position: 'absolute', top: lane === 'bottom' ? 4 : 21, height: 12, left: value < 0 ? `${50 - size}%` : '50%', width: `${size}%`, bgcolor: value < 0 ? COLORS.bad : COLORS.good, borderRadius: '2px', minWidth: value ? 2 : 0 }} />;
   };
-  return <Card sx={{ p: { xs: 1.5, md: 2.5 } }}>
+  return <Card sx={{ p: { xs: 1.5, md: 2.5 }, height: '100%' }}>
     <Typography sx={{ fontSize: 17, fontWeight: 900, mb: 2 }}>📊 SITE PERFORMANCE RANKING — DIVERGING VIEW</Typography>
     <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
       <Box sx={{ bgcolor: '#b91c1c', border: `1px solid ${COLORS.bad}`, borderRadius: 4, px: 1.5, py: 0.7, fontWeight: 900 }}>↓ BOTTOM 10 SITES</Box>

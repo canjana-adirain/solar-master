@@ -104,13 +104,18 @@ export default function HealthCard({ summary, onMetricClick }) {
                     sx={{
                       height: 6,
                       width: '100%',
-                      borderRadius: 4,
+                      borderRadius: 2,
                       bgcolor: 'action.hover',
                       '& .MuiLinearProgress-bar': {
                         bgcolor: stateColor,
+                        borderRadius: 2,
                       },
                     }}
                   />
+                  <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.35 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: 9.5, lineHeight: 1 }}>0%</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: 9.5, lineHeight: 1 }}>100%</Typography>
+                  </Stack>
                 </Box>
 
                 <Typography fontWeight={900} color={stateColor} sx={{ minWidth: 62, textAlign: 'right', lineHeight: 1.2 }}>

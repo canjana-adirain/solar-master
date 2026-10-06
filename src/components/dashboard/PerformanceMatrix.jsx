@@ -16,6 +16,7 @@ const gradeMeta = {
 export default function PerformanceMatrix({
   sites,
   summary,
+  previousSummary,
   onGradeClick,
   onExcel,
   onPdf,
@@ -25,6 +26,25 @@ export default function PerformanceMatrix({
 
   const pe = Number(summary.averageActualExpected || 0);
   const specificYield = Number(summary.specificYield || 0);
+  const comparison = (current, previous, { percent = true } = {}) => {
+    if (!previousSummary || !Number.isFinite(previous)) return { label: 'no previous round', tone: 'flat' };
+    const difference = percent ? (current - previous) * 100 : current - previous;
+    if (Math.abs(difference) < 0.05) return { label: '→ 0.0% vs Previous Round', tone: 'flat' };
+    const up = difference > 0;
+    return {
+      label: `${up ? '↑ +' : '↓ '}${Math.abs(difference).toFixed(1)}${percent ? '%' : ''} vs Previous Round`,
+      tone: up ? 'up' : 'down',
+    };
+  };
+  const peComparison = comparison(pe, Number(previousSummary?.averageActualExpected));
+  const yieldComparison = comparison(specificYield, Number(previousSummary?.specificYield), { percent: false });
+  const comparisonChip = ({ label, tone }) => (
+    <Box sx={{ mt: 1.25, px: 1.5, py: 0.65, borderRadius: 4, fontSize: 12, fontWeight: 800,
+      color: tone === 'up' ? '#22c55e' : tone === 'down' ? '#ff7070' : 'text.secondary',
+      bgcolor: tone === 'up' ? 'rgba(34,197,94,.12)' : tone === 'down' ? 'rgba(239,68,68,.12)' : 'action.hover' }}>
+      {label}
+    </Box>
+  );
 
   const radius = 88;
   const circumference = 2 * Math.PI * radius;
@@ -177,6 +197,7 @@ export default function PerformanceMatrix({
               </Box>
             </Box>
           </Box>
+          {comparisonChip(peComparison)}
         </Box>
 
         {/* Specific Yield */}
@@ -235,6 +256,7 @@ export default function PerformanceMatrix({
             >
               Specific Yield
             </Typography>
+            {comparisonChip(yieldComparison)}
           </Box>
         </Box>
       </Box>

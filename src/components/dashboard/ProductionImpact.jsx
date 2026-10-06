@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import CableRoundedIcon from '@mui/icons-material/CableRounded';
+import ConstructionRoundedIcon from '@mui/icons-material/ConstructionRounded';
 import CellTowerRoundedIcon from '@mui/icons-material/CellTowerRounded';
 import ElectricBoltRoundedIcon from '@mui/icons-material/ElectricBoltRounded';
 import NetworkCheckRoundedIcon from '@mui/icons-material/NetworkCheckRounded';
@@ -16,6 +17,7 @@ const tiles = (summary) => [
   { label: 'Comms / Potential', value: formatPercent(summary.commsImpact), count: `${formatNumber(summary.commsCount)} count`, color: COLORS.cyan, icon: CellTowerRoundedIcon, key: 'comms' },
   { label: 'MPPT Spikes', value: formatNumber(summary.mpptSpikes), count: 'count', color: COLORS.purple, icon: NetworkCheckRoundedIcon, key: 'mpptSpikes' },
   { label: 'Potential RSD Failures', value: formatNumber(summary.mpptCount), count: 'count', color: COLORS.good, icon: ElectricBoltRoundedIcon, key: 'mppt' },
+  { label: 'Spare MPPT', value: formatNumber(summary.spareMppt), count: 'count', color: '#94a3b8', icon: ConstructionRoundedIcon, key: 'spare' },
 ];
 
 export default function ProductionImpact({ summary, onMetricClick, onExcel, onPdf }) {
@@ -41,7 +43,7 @@ export default function ProductionImpact({ summary, onMetricClick, onExcel, onPd
           <Stack direction="row" spacing={2} flexWrap="wrap" mt={0.75}>{[['Inverter', COLORS.warn], ['Comms / Potential', COLORS.cyan], ['String', COLORS.pink]].map(([label, color]) => <Typography key={label} variant="caption" color="text.secondary"><Box component="span" sx={{ display: 'inline-block', width: 8, height: 8, mr: 0.5, borderRadius: 0.5, bgcolor: color }} />{label}</Typography>)}</Stack>
         </Box>
       </Box>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(5, 1fr)' }, gap: 1 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, gap: 1 }}>
         {tiles(summary).map(({ label, value, count, color, icon: Icon, key }) => (
           <CardActionArea key={key} onClick={() => onMetricClick(key)} sx={{ border: 1, borderColor: `${color}55`, borderRadius: 1.5, p: 1.1, minHeight: 122, '&:hover': { bgcolor: `${color}12`, borderColor: color } }}>
             <Stack direction="row" alignItems="center" spacing={0.6} color={color}><Icon fontSize="small" /><Typography variant="caption" fontWeight={800}>{label}</Typography></Stack>

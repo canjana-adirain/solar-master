@@ -19,17 +19,17 @@ export default function PortfolioCharts({ sites, onSiteClick, onImpactedSiteClic
     onHover: (event, elements) => { if (event.native?.target) event.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
   };
 
-  return <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1.5, mb: 1.5 }}>
-    <Box id="site-performance-ranking" tabIndex={-1} sx={{ scrollMarginTop: { xs: '140px', lg: '90px' } }}>
+  return <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) minmax(0, 1fr)' }, gap: 1.5, mb: 1.5, alignItems: 'stretch' }}>
+    <Box id="site-performance-ranking" tabIndex={-1} sx={{ scrollMarginTop: { xs: '140px', lg: '90px' }, minWidth: 0 }}>
       <PerformanceRanking sites={sites} onSiteClick={onSiteClick} />
     </Box>
-    <Card id="top-impacted-sites" tabIndex={-1} sx={{ p: 1.75, scrollMarginTop: { xs: '140px', lg: '90px' } }}>
+    <Card id="top-impacted-sites" tabIndex={-1} sx={{ p: 1.75, scrollMarginTop: { xs: '140px', lg: '90px' }, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <SectionHeader color="secondary.main" title="Top 10 Impacted Sites — Total Impact %" subtitle="Click a bar for the site’s detailed impact" />
-      <Box sx={{ height: 360 }}>
+      <Box sx={{ flex: 1, minHeight: { xs: 360, lg: 520 }, position: 'relative' }}>
         <Bar data={{ labels: impacted.map(({ site }) => site.site.slice(0, 36)), datasets: [
-          { label: 'Breakdown %', data: impacted.map(({ bd }) => bd * 100), backgroundColor: COLORS.warn, borderRadius: 3 },
-          { label: 'String %', data: impacted.map(({ string }) => string * 100), backgroundColor: COLORS.bad, borderRadius: 3 },
-          { label: 'Comms / Potential %', data: impacted.map(({ comms }) => comms * 100), backgroundColor: COLORS.cyan, borderRadius: 3 },
+          { label: 'Breakdown %', data: impacted.map(({ bd }) => bd * 100), backgroundColor: COLORS.warn, borderRadius: 2 },
+          { label: 'String %', data: impacted.map(({ string }) => string * 100), backgroundColor: COLORS.bad, borderRadius: 2 },
+          { label: 'Comms / Potential %', data: impacted.map(({ comms }) => comms * 100), backgroundColor: COLORS.cyan, borderRadius: 2 },
         ] }} options={options} />
       </Box>
     </Card>

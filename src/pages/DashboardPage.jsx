@@ -5,7 +5,6 @@ import { COLORS, GRADE_COLOR, SITE_COLUMNS } from '../constants.js';
 import { effectiveImpact, isHealthyInvPm, summarizePortfolio } from '../utils/analytics.js';
 import { cleanText, formatNumber, formatPercent } from '../utils/format.js';
 import { exportElementPdf, exportWorkbook } from '../utils/export.js';
-import SiteFilters from '../components/SiteFilters.jsx';
 import DetailsDialog from '../components/dashboard/DetailsDialog.jsx';
 import EquipmentFailureTable from '../components/dashboard/EquipmentFailureTable.jsx';
 import HealthCard from '../components/dashboard/HealthCard.jsx';
@@ -23,6 +22,7 @@ const anomalyConfig = {
   comms: { title: 'Comms / Potential', key: 'comms_cnt', textKey: 'comms_txt', color: COLORS.cyan, impact: ['comms_cnt', 'pot_impact'] },
   mppt: { title: 'Potential RSD Failures', key: 'mppt_cnt', textKey: 'mppt_txt', color: COLORS.good },
   mpptSpikes: { title: 'MPPT Spikes', key: 'mppt_spikes', color: COLORS.purple },
+  spare: { title: 'Spare MPPT', key: 'spare_mppt', color: '#94a3b8' },
 };
 
 const dashboardSections = [
@@ -49,12 +49,10 @@ function tableRows(sites) {
   }));
 }
 
-export default function DashboardPage({ sites, roundName = 'Solar Master' }) {
-  const [selected, setSelected] = useState([]);
-  const [search, setSearch] = useState('');
+export default function DashboardPage({ sites, previousSites = null, roundName = 'Solar Master', selected = [], onSelectedChange }) {
   const [detail, setDetail] = useState(null);
   const [sectionsAnchor, setSectionsAnchor] = useState(null);
-  useEffect(() => { setSelected([]); setSearch(''); setDetail(null); }, [sites]);
+  useEffect(() => { setDetail(null); }, [sites]);
 
   const jumpToSection = (id) => {
     setSectionsAnchor(null);
@@ -67,10 +65,18 @@ export default function DashboardPage({ sites, roundName = 'Solar Master' }) {
 
   const visibleSites = useMemo(() => selected.length ? sites.filter((site) => selected.includes(site.site)) : sites, [selected, sites]);
   const summary = useMemo(() => summarizePortfolio(visibleSites), [visibleSites]);
+  const previousVisibleSites = useMemo(() => {
+    if (!previousSites?.length) return null;
+    if (!selected.length) return previousSites;
+    const names = new Set(selected.map((name) => String(name).trim().toLowerCase()));
+    const filtered = previousSites.filter((site) => names.has(String(site.site || '').trim().toLowerCase()));
+    return filtered.length ? filtered : null;
+  }, [previousSites, selected]);
+  const previousSummary = useMemo(() => previousVisibleSites ? summarizePortfolio(previousVisibleSites) : null, [previousVisibleSites]);
 
   const openSite = (site) => setDetail({ kind: 'site', title: site.site, subtitle: 'Complete site performance and issue details.', sites: [site] });
   const openImpactedSite = (site) => setDetail({ kind: 'impactedSite', title: site.site, subtitle: 'Impact breakdown and equipment issues for this site.', sites: [site] });
-  const setSiteFilter = (list) => { setSelected(list.map((site) => site.site)); setDetail(null); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const setSiteFilter = (list) => { onSelectedChange?.(list.map((site) => site.site)); setDetail(null); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const openList = (title, list, valueFor, subtitle, extra = {}) => setDetail({ title, subtitle: subtitle || `${list.length} site${list.length === 1 ? '' : 's'} in the current selection.`, sites: list, valueFor, ...extra });
 
   const openStat = (kind) => {
@@ -112,24 +118,16 @@ export default function DashboardPage({ sites, roundName = 'Solar Master' }) {
     openList(config.title, list, null, `${formatNumber(count)} issue${count === 1 ? '' : 's'} across ${list.length} site${list.length === 1 ? '' : 's'}.`, { kind: 'impact', impactKey: kind, color: config.color });
   };
 
-  const handleSearch = (value) => {
-    setSearch(value);
-    const query = value.trim().toLowerCase();
-    setSelected(query ? sites.filter((site) => site.site.toLowerCase().includes(query)).map((site) => site.site) : []);
-  };
-  const reset = () => { setSelected([]); setSearch(''); };
-
   const exportSites = () => exportWorkbook(`Site-Level Detail · ${roundName}`, SITE_COLUMNS.map(([, label]) => label), tableRows(visibleSites), `SiteLevelDetail_${roundName}`);
   const exportPerformance = () => exportWorkbook(`Performance Matrix · ${roundName}`, ['Grade', 'Label', 'Site', 'Actual/Expected %', 'Specific Yield (kWh/kWp)', 'DC (kW)'], visibleSites.map((site) => [site.grade ?? '', ({ 5: 'Excellent', 4: 'Good', 3: 'Fair', 2: 'Poor', 1: 'Critical' })[site.grade] || '—', site.site, formatPercent(site.ae), site.specific_yield || '', site.dc || 0]), `PerformanceMatrix_${roundName}`);
-  const exportImpact = () => exportWorkbook(`Production Impact · ${roundName}`, ['Site', 'Breakdown %', 'String %', 'Comms %', 'MPPT spikes', 'RSD count'], visibleSites.map((site) => [site.site, formatPercent(effectiveImpact(site, 'bd_cnt', 'inv_bd_impact')), formatPercent(effectiveImpact(site, 'str_cnt', 'str_impact')), formatPercent(effectiveImpact(site, 'comms_cnt', 'pot_impact')), site.mppt_spikes || 0, site.mppt_cnt || 0]), `ProductionImpact_${roundName}`);
+  const exportImpact = () => exportWorkbook(`Production Impact · ${roundName}`, ['Site', 'Breakdown %', 'String %', 'Comms %', 'MPPT spikes', 'RSD count', 'Spare MPPT count'], visibleSites.map((site) => [site.site, formatPercent(effectiveImpact(site, 'bd_cnt', 'inv_bd_impact')), formatPercent(effectiveImpact(site, 'str_cnt', 'str_impact')), formatPercent(effectiveImpact(site, 'comms_cnt', 'pot_impact')), site.mppt_spikes || 0, site.mppt_cnt || 0, site.spare_mppt || 0]), `ProductionImpact_${roundName}`);
   const exportLeaders = () => exportWorkbook(`Top Impacted Sites · ${roundName}`, ['Site', 'String Impact', 'Breakdown Impact', 'Comms Impact', 'RSD count'], visibleSites.map((site) => [site.site, formatPercent(effectiveImpact(site, 'str_cnt', 'str_impact')), formatPercent(effectiveImpact(site, 'bd_cnt', 'inv_bd_impact')), formatPercent(effectiveImpact(site, 'comms_cnt', 'pot_impact')), site.mppt_cnt || 0]), `TopImpacted_${roundName}`);
 
   return (
     <>
-      <SiteFilters sites={sites} selected={selected} onChange={setSelected} search={search} onSearchChange={handleSearch} onReset={reset} />
       <Box id="portfolio-overview" tabIndex={-1} sx={sectionStyle}><StatStrip summary={summary} onOpen={openStat} /></Box>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1.2fr 1fr' }, gap: 1.5, mb: 1.5 }}>
-        <Box id="performance-matrix" tabIndex={-1} sx={sectionStyle}><PerformanceMatrix sites={visibleSites} summary={summary} onGradeClick={openGrade} onExcel={exportPerformance} onPdf={(element) => exportElementPdf(element, `PerformanceMatrix_${roundName}`, `Performance Matrix · ${roundName}`)} /></Box>
+        <Box id="performance-matrix" tabIndex={-1} sx={sectionStyle}><PerformanceMatrix sites={visibleSites} summary={summary} previousSummary={previousSummary} onGradeClick={openGrade} onExcel={exportPerformance} onPdf={(element) => exportElementPdf(element, `PerformanceMatrix_${roundName}`, `Performance Matrix · ${roundName}`)} /></Box>
         <Box id="system-health" tabIndex={-1} sx={sectionStyle}><HealthCard summary={summary} onMetricClick={openHealth} /></Box>
         <Box id="inv-pm-health" tabIndex={-1} sx={sectionStyle}><InvPmHealth sites={visibleSites} summary={summary} onStatusClick={openStatus} /></Box>
       </Box>

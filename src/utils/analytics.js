@@ -58,7 +58,7 @@ export function summarizePortfolio(sites) {
     bdImpact, stringImpact, commsImpact,
     totalImpact: Math.min(1, bdImpact + stringImpact + commsImpact),
     bdCount: sum(sites, 'bd_cnt'), stringCount: stringsDown, commsCount: sum(sites, 'comms_cnt'),
-    mpptCount: sum(sites, 'mppt_cnt'), mpptSpikes: sum(sites, 'mppt_spikes'),
+    mpptCount: sum(sites, 'mppt_cnt'), mpptSpikes: sum(sites, 'mppt_spikes'), spareMppt: sum(sites, 'spare_mppt'),
     averageActualExpected: average(sites, 'ae'), averageInvPm: invPmValues.length ? invPmValues.reduce((a, b) => a + b, 0) / invPmValues.length : 0,
     goodInvPm: good, badInvPm: sites.length - good,
     healthyPercent: sites.length ? Math.round(good / sites.length * 100) : 0,

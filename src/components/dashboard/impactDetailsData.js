@@ -10,6 +10,7 @@ export const impactTypes = {
   comms: { title: 'Comms / Potential', noun: 'communication issues', key: 'comms_cnt', textKey: 'comms_txt', color: COLORS.cyan, impact: ['comms_cnt', 'pot_impact'], impactLabel: 'Comms impact' },
   mpptSpikes: { title: 'MPPT Spikes', noun: 'MPPT spikes', key: 'mppt_spikes', color: COLORS.purple },
   mppt: { title: 'Potential RSD Failures', noun: 'potential RSD failures', key: 'mppt_cnt', textKey: 'mppt_txt', color: COLORS.good },
+  spare: { title: 'Spare MPPT', noun: 'spare MPPTs', key: 'spare_mppt', color: '#94a3b8' },
 };
 
 export function impactValue(site, config) {

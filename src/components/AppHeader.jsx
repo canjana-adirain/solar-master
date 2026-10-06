@@ -8,10 +8,12 @@ import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import {
   AppBar, Box, Button, Chip, FormControl, IconButton, MenuItem, Select, Stack, Toolbar, Tooltip, Typography,
 } from '@mui/material';
+import SiteFilters from './SiteFilters.jsx';
 
 export default function AppHeader({
   role, user, view, onViewChange, onLogout, mode, onToggleMode,
   rounds, activeRoundId, onRoundChange, dateRange, cloudStatus,
+  sites = [], selectedSites = [], onSelectedSitesChange, siteSearch = '', onSiteSearchChange, onResetSiteFilters,
 }) {
   return (
     <AppBar position="sticky" color="transparent" elevation={0} data-no-print="true" sx={{ backdropFilter: 'blur(14px)', borderBottom: 1, borderColor: 'divider', bgcolor: (theme) => `${theme.palette.background.default}e8` }}>
@@ -58,6 +60,19 @@ export default function AppHeader({
           <Tooltip title="Logout"><IconButton color="error" onClick={onLogout}><LogoutRoundedIcon /></IconButton></Tooltip>
         </Stack>
       </Toolbar>
+      {view === 'dashboard' && (
+        <Box sx={{ px: { xs: 1.5, sm: 2.25 }, pb: 1.25 }}>
+          <SiteFilters
+            sites={sites}
+            selected={selectedSites}
+            onChange={onSelectedSitesChange}
+            search={siteSearch}
+            onSearchChange={onSiteSearchChange}
+            onReset={onResetSiteFilters}
+            inHeader
+          />
+        </Box>
+      )}
     </AppBar>
   );
 }
