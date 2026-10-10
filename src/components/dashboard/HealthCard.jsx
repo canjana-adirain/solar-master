@@ -2,130 +2,126 @@ import CableRoundedIcon from '@mui/icons-material/CableRounded';
 import DataUsageRoundedIcon from '@mui/icons-material/DataUsageRounded';
 import DeveloperBoardRoundedIcon from '@mui/icons-material/DeveloperBoardRounded';
 import SecurityRoundedIcon from '@mui/icons-material/SecurityRounded';
-import StarsRoundedIcon from '@mui/icons-material/StarsRounded';
 import { Box, Card, CardActionArea, LinearProgress, Stack, Typography } from '@mui/material';
 import { COLORS } from '../../constants.js';
-import { formatPercent } from '../../utils/format.js';
+import { formatNumber, formatPercent } from '../../utils/format.js';
 import SectionHeader from '../common/SectionHeader.jsx';
 
-const rows = (summary) => [
-  { label: 'DSD Avail.', value: summary.dsd, icon: SecurityRoundedIcon, color: COLORS.accent, detail: 'DSD-adjusted uptime of the portfolio', key: 'dsd' },
-  { label: 'Adirain Avail.', value: summary.adirainAvailability, icon: StarsRoundedIcon, color: COLORS.good, detail: 'Composite = Data × Inverter × String availability', key: 'adirain' },
-  { label: 'Data Avail.', value: summary.dataAvailability, icon: DataUsageRoundedIcon, color: COLORS.purple, detail: 'Share of expected data points received after QC', key: 'data' },
-  { label: 'Inverter Avail.', value: summary.inverterAvailability, icon: DeveloperBoardRoundedIcon, color: COLORS.cyan, detail: 'Inverter operational uptime across the fleet', key: 'inverter' },
-  { label: 'String Avail.', value: summary.stringAvailability, icon: CableRoundedIcon, color: COLORS.warn, detail: 'Strings up vs. configured strings', key: 'string' },
-];
+const clamp = (value) => Math.max(0, Math.min(100, (Number(value) || 0) * 100));
+const comparison = (current, previous) => {
+  if (!Number.isFinite(Number(previous)) || previous == null) return 'no previous round';
+  const delta = (Number(current || 0) - Number(previous || 0)) * 100;
+  if (Math.abs(delta) < 0.05) return '→ 0.0% vs previous round';
+  return `${delta > 0 ? '↑ +' : '↓ '}${Math.abs(delta).toFixed(1)}% vs previous round`;
+};
 
-export default function HealthCard({ summary, onMetricClick }) {
+function Progress({ value, color, showScale = true }) {
   return (
-    <Card
-      sx={{
-        p: 1.75,
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
+    <Box sx={{ minWidth: 0 }}>
+      <LinearProgress variant="determinate" value={clamp(value)} sx={{ height: 5, borderRadius: 5, bgcolor: 'rgba(148,163,184,.2)', '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 5 } }} />
+      {showScale && (
+        <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.2 }}>
+          <Typography sx={{ fontSize: 8.5, color: 'text.secondary' }}>0%</Typography>
+          <Typography sx={{ fontSize: 8.5, color: 'text.secondary' }}>100%</Typography>
+        </Stack>
+      )}
+    </Box>
+  );
+}
+
+function Gauge({ value }) {
+  const size = 108;
+  const radius = 44;
+  const circumference = 2 * Math.PI * radius;
+  const dash = `${clamp(value) / 100 * circumference} ${circumference}`;
+  return (
+    <Box sx={{ width: size, height: size, position: 'relative', flex: '0 0 auto', filter: 'drop-shadow(0 0 8px rgba(34,197,94,.3))' }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(34,197,94,.14)" strokeWidth="9" />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#22c55e" strokeWidth="9" strokeLinecap="round" strokeDasharray={dash} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      </svg>
+      <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', textAlign: 'center' }}>
+        <Box>
+          <Typography sx={{ fontSize: 8, fontWeight: 900, lineHeight: 1.1 }}>⭐ ADIRAIN</Typography>
+          <Typography sx={{ fontSize: 22, lineHeight: 1.1, fontWeight: 950, color: COLORS.good }}>{formatPercent(value)}</Typography>
+          <Typography sx={{ fontSize: 7.5, color: 'text.secondary' }}>Data × Inv × String</Typography>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+function ChildCard({ title, value, previous, color, icon: Icon, description, countText, onClick }) {
+  return (
+    <CardActionArea
+      onClick={onClick}
+      title="Click for site-wise details"
+      sx={{ border: `1px solid ${color}88`, borderRadius: 1.5, px: 1, py: 0.8, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start', bgcolor: `${color}09`, '&:hover': { bgcolor: `${color}14`, borderColor: color } }}
     >
-      <SectionHeader icon="🛡️" title="SYSTEM HEALTH & UPTIME" subtitle="Availability Overview" color="success.main" />
-      <Stack
-        spacing={1.25}
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          display: 'flex',
-        }}
-      >
-        {rows(summary).map(({ label, value, icon: Icon, color, detail, key }) => {
-          const percentage = Math.max(0, Math.min(100, value * 100));
-          const stateColor = percentage >= 95 ? COLORS.good : percentage >= 90 ? COLORS.warn : COLORS.bad;
-
-          return (
-            <CardActionArea
-              key={key}
-              onClick={() => onMetricClick(key)}
-              sx={{
-                borderRadius: 2,
-                border: `1px solid ${color}66`,
-                px: 1.25,
-                py: 0.75,
-                minHeight: 78,
-                display: 'flex',
-                alignItems: 'center',
-                flex: 1,
-                width: '100%',
-              }}
-            >
-              <Box
-                sx={{
-                  width: '100%',
-                  display: 'grid',
-                  gridTemplateColumns: '34px minmax(150px, 1.1fr) minmax(150px, 1.5fr) auto',
-                  columnGap: 2,
-                  alignItems: 'center',
-                  minWidth: 0,
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 1.75,
-                    bgcolor: `${color}22`,
-                    color,
-                    display: 'grid',
-                    placeItems: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Icon fontSize="small" />
-                </Box>
-
-                <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <Typography variant="body2" fontWeight={800} lineHeight={1.2}>
-                    {label}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{
-                      display: { xs: 'none', sm: 'block' },
-                      lineHeight: 1.2,
-                      mt: 0.15,
-                    }}
-                  >
-                    {detail}
-                  </Typography>
-                </Box>
-
-                <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <LinearProgress
-                    variant="determinate"
-                    value={percentage}
-                    sx={{
-                      height: 6,
-                      width: '100%',
-                      borderRadius: 2,
-                      bgcolor: 'action.hover',
-                      '& .MuiLinearProgress-bar': {
-                        bgcolor: stateColor,
-                        borderRadius: 2,
-                      },
-                    }}
-                  />
-                  <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.35 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: 9.5, lineHeight: 1 }}>0%</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: 9.5, lineHeight: 1 }}>100%</Typography>
-                  </Stack>
-                </Box>
-
-                <Typography fontWeight={900} color={stateColor} sx={{ minWidth: 62, textAlign: 'right', lineHeight: 1.2 }}>
-                  {formatPercent(value)}
-                </Typography>
-              </Box>
-            </CardActionArea>
-          );
-        })}
+      <Stack direction="row" alignItems="center" spacing={0.6}>
+        <Box sx={{ width: 24, height: 24, display: 'grid', placeItems: 'center', borderRadius: 1, color, bgcolor: `${color}20`, border: `1px solid ${color}66`, '& svg': { fontSize: 15 } }}><Icon /></Box>
+        <Typography fontWeight={900} noWrap sx={{ color, fontSize: 12.5 }}>{title}</Typography>
       </Stack>
+      <Typography sx={{ mt: 0.5, fontSize: 22, lineHeight: 1.15, fontWeight: 950, color, textAlign: 'center' }}>{formatPercent(value)}</Typography>
+      <Typography sx={{ fontSize: 9.5, color: 'text.secondary', textAlign: 'center', mb: 0.6 }}>{comparison(value, previous)}</Typography>
+      <Progress value={value} color={color} />
+      <Typography sx={{ mt: 0.5, fontSize: 10, color: 'text.secondary', lineHeight: 1.3 }}>{description}</Typography>
+      <Typography sx={{ mt: 0.3, fontSize: 10, fontWeight: 800, color }}>{countText}</Typography>
+    </CardActionArea>
+  );
+}
+
+export default function HealthCard({ summary, previousSummary = null, onMetricClick }) {
+  return (
+    <Card sx={{ p: { xs: 1.5, lg: 1.75 }, height: '100%', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <SectionHeader icon="🛡️" title="SYSTEM HEALTH & UPTIME" subtitle="Availability Overview" color="success.main" />
+
+      {/* DSD */}
+      <CardActionArea onClick={() => onMetricClick('dsd')} title="Click for site-wise details" sx={{ border: `1px solid ${COLORS.accent}55`, borderRadius: 1.5, px: 1.25, py: 0.9, mb: 1.1 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '28px 1fr auto', sm: '28px minmax(120px,1fr) minmax(110px,1.2fr) auto' }, gap: 1, alignItems: 'center' }}>
+          <Box sx={{ width: 28, height: 28, borderRadius: 1, display: 'grid', placeItems: 'center', color: COLORS.accent, bgcolor: `${COLORS.accent}20`, border: `1px solid ${COLORS.accent}66`, '& svg': { fontSize: 16 } }}><SecurityRoundedIcon /></Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography fontWeight={900} sx={{ fontSize: 13, lineHeight: 1.2 }}>DSD Avail.</Typography>
+            <Typography sx={{ fontSize: 10, color: 'text.secondary', lineHeight: 1.2 }}>DSD-adjusted uptime of the portfolio</Typography>
+          </Box>
+          <Box sx={{ display: { xs: 'none', sm: 'block' } }}><Progress value={summary.dsd} color={COLORS.accent} /></Box>
+          <Box sx={{ textAlign: 'right' }}>
+            <Typography sx={{ fontSize: 21, lineHeight: 1.1, fontWeight: 950, color: COLORS.accent }}>{formatPercent(summary.dsd)}</Typography>
+            <Typography sx={{ fontSize: 9, color: 'text.secondary', whiteSpace: 'nowrap' }}>{comparison(summary.dsd, previousSummary?.dsd)}</Typography>
+          </Box>
+        </Box>
+      </CardActionArea>
+
+      {/* Adirain hero */}
+      <CardActionArea onClick={() => onMetricClick('adirain')} title="Click for site-wise details" sx={{ border: `1px solid ${COLORS.good}66`, borderRadius: 1.5, px: 1.5, py: 1.15, bgcolor: `${COLORS.good}06`, '&:hover': { bgcolor: `${COLORS.good}10`, borderColor: COLORS.good } }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 1.25, alignItems: 'center' }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontSize: 17, lineHeight: 1.2, fontWeight: 950, color: COLORS.good }}>Adirain Availability</Typography>
+            <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.3, lineHeight: 1.3 }}>Composite availability derived from Data, Inverter and String availability.</Typography>
+            <Box sx={{ width: 32, height: 2.5, bgcolor: COLORS.good, borderRadius: 3, my: 0.8 }} />
+            <Typography sx={{ fontSize: 10.5, color: 'text.secondary' }}>👆 Click to know more</Typography>
+            <Typography sx={{ mt: 0.3, fontSize: 10, color: COLORS.good, fontWeight: 800 }}>{formatNumber(summary.inverters)} inverters · {formatNumber(summary.strings)} strings checked</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <Gauge value={summary.adirainAvailability} />
+            <Typography sx={{ fontSize: 9, color: 'text.secondary', whiteSpace: 'nowrap' }}>{comparison(summary.adirainAvailability, previousSummary?.adirainAvailability)}</Typography>
+          </Box>
+        </Box>
+      </CardActionArea>
+
+      {/* Connector */}
+      <Box sx={{ height: 24, position: 'relative', display: { xs: 'none', sm: 'block' } }}>
+        <Box sx={{ position: 'absolute', left: '50%', top: 0, width: 2, height: 9, bgcolor: COLORS.cyan }} />
+        <Box sx={{ position: 'absolute', left: '16.7%', right: '16.7%', top: 8, height: 2, bgcolor: COLORS.cyan }} />
+        {[16.7, 50, 83.3].map((left) => <Box key={left} sx={{ position: 'absolute', left: `${left}%`, top: 8, width: 2, height: 10, bgcolor: COLORS.cyan }} />)}
+      </Box>
+
+      {/* Children */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0,1fr))' }, gap: 1.15, mt: { xs: 0.9, sm: 0 }, flex: 1 }}>
+        <ChildCard title="Data Avail." value={summary.dataAvailability} previous={previousSummary?.dataAvailability} color={COLORS.purple} icon={DataUsageRoundedIcon} description="Expected data points received after QC" countText={`${formatNumber(summary.inverters)} inverters checked`} onClick={() => onMetricClick('data')} />
+        <ChildCard title="Inverter Avail." value={summary.inverterAvailability} previous={previousSummary?.inverterAvailability} color={COLORS.cyan} icon={DeveloperBoardRoundedIcon} description="Inverter operational uptime across the fleet" countText={`${formatNumber(summary.inverters)} inverters checked`} onClick={() => onMetricClick('inverter')} />
+        <ChildCard title="String Avail." value={summary.stringAvailability} previous={previousSummary?.stringAvailability} color={COLORS.warn} icon={CableRoundedIcon} description="Strings up vs. configured strings" countText={`${formatNumber(summary.strings)} configured strings`} onClick={() => onMetricClick('string')} />
+      </Box>
     </Card>
   );
 }

@@ -7,16 +7,56 @@ export const isHealthyInvPm = (site) => {
 
 export const sum = (sites, key) => sites.reduce((total, site) => total + (Number(site[key]) || 0), 0);
 
+export function siteStringAvailability(site) {
+  const totalStrings = Number(site.total_strings) || 0;
+  const stringsDown = Math.max(0, Number(site.str_cnt) || 0);
+  return totalStrings > 0
+    ? Math.max(0, 1 - stringsDown / totalStrings)
+    : Math.max(0, 1 - (Number(site.str_impact) || 0));
+}
+
+export function normalizeSites(sites = []) {
+  return sites.map((site) => {
+    const normalized = { ...site };
+    if (Array.isArray(site.breakdownInverters)) {
+      normalized.bd_cnt = site.breakdownInverters.length;
+      normalized.inv_bd_impact = Math.min(1, site.breakdownInverters.reduce((total, item) => total + (Number(item.impact) || 0), 0));
+    }
+    if (Array.isArray(site.communicationIssues)) {
+      normalized.comms_cnt = site.communicationIssues.length;
+      normalized.pot_impact = Math.min(1, site.communicationIssues.reduce((total, item) => total + (Number(item.impact) || 0), 0));
+    }
+    return normalized;
+  });
+}
+
+export const activeBreakdownCount = (site) => Array.isArray(site.breakdownInverters)
+  ? site.breakdownInverters.length
+  : Number(site.bd_cnt) || 0;
+
+export const activeCommunicationCount = (site) => Array.isArray(site.communicationIssues)
+  ? site.communicationIssues.length
+  : Number(site.comms_cnt) || 0;
+
 export const average = (sites, key) => {
   const values = finiteValues(sites, key);
   return values.length ? values.reduce((total, value) => total + value, 0) / values.length : 0;
 };
 
 export function effectiveImpact(site, countKey, impactKey) {
+  if (countKey === 'bd_cnt' && Array.isArray(site.breakdownInverters)) {
+    const detailImpact = site.breakdownInverters.reduce((total, item) => total + (Number(item.impact) || 0), 0);
+    if (detailImpact > 0 || site.breakdownInverters.length === 0) return Math.min(1, detailImpact);
+  }
+  if (countKey === 'comms_cnt' && Array.isArray(site.communicationIssues)) {
+    const detailImpact = site.communicationIssues.reduce((total, item) => total + (Number(item.impact) || 0), 0);
+    if (detailImpact > 0 || site.communicationIssues.length === 0) return Math.min(1, detailImpact);
+  }
   const recorded = Number(site[impactKey]) || 0;
   if (recorded > 0) return recorded;
   const total = Number(site.tot_inv) || 0;
-  const affected = Number(site[countKey]) || 0;
+  const affected = countKey === 'bd_cnt' ? activeBreakdownCount(site)
+    : countKey === 'comms_cnt' ? activeCommunicationCount(site) : Number(site[countKey]) || 0;
   return total > 0 && affected > 0 ? Math.min(1, affected / total) : 0;
 }
 
@@ -57,7 +97,8 @@ export function summarizePortfolio(sites) {
     specificYield,
     bdImpact, stringImpact, commsImpact,
     totalImpact: Math.min(1, bdImpact + stringImpact + commsImpact),
-    bdCount: sum(sites, 'bd_cnt'), stringCount: stringsDown, commsCount: sum(sites, 'comms_cnt'),
+    bdCount: sites.reduce((total, site) => total + activeBreakdownCount(site), 0), stringCount: stringsDown,
+    commsCount: sites.reduce((total, site) => total + activeCommunicationCount(site), 0),
     mpptCount: sum(sites, 'mppt_cnt'), mpptSpikes: sum(sites, 'mppt_spikes'), spareMppt: sum(sites, 'spare_mppt'),
     averageActualExpected: average(sites, 'ae'), averageInvPm: invPmValues.length ? invPmValues.reduce((a, b) => a + b, 0) / invPmValues.length : 0,
     goodInvPm: good, badInvPm: sites.length - good,

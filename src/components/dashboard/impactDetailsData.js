@@ -17,24 +17,33 @@ export function impactValue(site, config) {
   return config.impact ? effectiveImpact(site, ...config.impact) : null;
 }
 
+export function siteIssueCount(site, config) {
+  if (config === impactTypes.bd && Array.isArray(site.breakdownInverters)) return site.breakdownInverters.length;
+  if (config === impactTypes.comms && Array.isArray(site.communicationIssues)) return site.communicationIssues.length;
+  return Number(site[config.key]) || 0;
+}
+
 export function issueItems(site, config) {
   if (config === impactTypes.bd && Array.isArray(site.breakdownInverters) && site.breakdownInverters.length) {
     return site.breakdownInverters.map((item) => ({ text: String(item.name || 'Inverter'), impact: Number(item.impact) > 0 ? Number(item.impact) : null }));
+  }
+  if (config === impactTypes.comms && Array.isArray(site.communicationIssues) && site.communicationIssues.length) {
+    return site.communicationIssues.map((item) => ({ text: String(item.text || 'Communication issue'), impact: Number(item.impact) > 0 ? Number(item.impact) : null }));
   }
   const raw = config.textKey ? cleanText(site[config.textKey]) : '';
   return raw ? raw.split(/\s*\|\s*|\r?\n/).map((text) => ({ text: text.trim().replace(/\s+is under breakdown\s*$/i, ''), impact: null })).filter((item) => item.text) : [];
 }
 
 export function impactSummary(sites, config) {
-  const count = sites.reduce((sum, site) => sum + (Number(site[config.key]) || 0), 0);
+  const count = sites.reduce((sum, site) => sum + siteIssueCount(site, config), 0);
   const values = config.impact ? sites.map((site) => impactValue(site, config)) : [];
-  return { count, siteCount: sites.length, average: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null, max: values.length ? Math.max(...values) : null, maxCount: sites.length ? Math.max(...sites.map((site) => Number(site[config.key]) || 0)) : 0 };
+  return { count, siteCount: sites.length, average: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null, max: values.length ? Math.max(...values) : null, maxCount: sites.length ? Math.max(...sites.map((site) => siteIssueCount(site, config))) : 0 };
 }
 
 export function exportImpactExcel(sites, config) {
   const rows = sites.flatMap((site) => {
     const items = issueItems(site, config);
-    return (items.length ? items : [{ text: '', impact: null }]).map(({ text, impact }) => [site.site, Number(site[config.key]) || 0, config.impact ? formatPercent(impactValue(site, config)) : '', text, impact == null ? '' : formatPercent(impact), site.dc || 0]);
+    return (items.length ? items : [{ text: '', impact: null }]).map(({ text, impact }) => [site.site, siteIssueCount(site, config), config.impact ? formatPercent(impactValue(site, config)) : '', text, impact == null ? '' : formatPercent(impact), site.dc || 0]);
   });
   exportWorkbook(`${config.title} by Site`, ['Site', 'Site Issue Count', 'Site Impact', 'Issue Detail', 'Item Impact', 'DC (kW)'], rows, config.title);
 }
@@ -55,7 +64,7 @@ export function exportImpactPdf(sites, config) {
   y += 10;
   sites.forEach((site) => {
     if (y > 690) { pdf.addPage(); y = 43; }
-    write(`${site.site} - ${formatNumber(site[config.key])} issue(s)${config.impact ? ` - ${formatPercent(impactValue(site, config))} impact` : ''}`, 11, true);
+    write(`${site.site} - ${formatNumber(siteIssueCount(site, config))} issue(s)${config.impact ? ` - ${formatPercent(impactValue(site, config))} impact` : ''}`, 11, true);
     const items = issueItems(site, config);
     items.forEach((item) => write(`  > ${item.text}${item.impact == null ? '' : ` - ${formatPercent(item.impact)}`}`));
     if (!items.length) write('  Individual issue details were not provided in the uploaded data.');

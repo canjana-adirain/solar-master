@@ -4,11 +4,19 @@ const NUMERIC_KEYS = new Set([
   'dc', 'ac', 'invpm', 'ae', 'dsd', 'mppt_cnt', 'spare_mppt', 'inv_bd_impact',
   'data_avail', 'tot_inv', 'rank', 'pot_impact', 'str_impact', 'bd_cnt', 'str_cnt',
   'comms_cnt', 'inv_avail', 'specific_yield', 'total_strings', 'mppt_spikes',
+  'ppa', 'repair_cost', 'str_loss_kwh', 'inv_loss_kwh', 'financial_loss',
 ]);
 
 export function mapHeader(value) {
   const text = String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
   if (!text) return null;
+  // Dispatch ROI columns (Summary AN–AS)
+  if (text === 'ppa' || text.startsWith('ppa ') || text.startsWith('ppa(')) return 'ppa';
+  if (text.includes('repair cost') || text.includes('dispatch cost')) return 'repair_cost';
+  if (text.includes('string') && text.includes('loss') && text.includes('kwh')) return 'str_loss_kwh';
+  if (text.includes('inverter') && text.includes('loss') && text.includes('kwh')) return 'inv_loss_kwh';
+  if (text.includes('financial loss')) return 'financial_loss';
+  if (text.includes('payback')) return 'payback_days';
   if (text.includes('inv/pm') && text.includes('status')) return 'invpm_status';
   if (text.includes('inv/pm')) return 'invpm';
   if (text.includes('impact')) {
@@ -73,6 +81,11 @@ export function gridToSites(grid) {
         site[key] = Number.isNaN(number) ? 0 : number;
       } else site[key] = String(site[key]);
     });
+    // Payback is numeric or the text "No Loss"
+    if ('payback_days' in site) {
+      const payback = Number.parseFloat(String(site.payback_days).replace(/[,\s]/g, ''));
+      site.payback_days = Number.isFinite(payback) ? payback : null;
+    }
     ['ae', 'dsd', 'data_avail', 'inv_avail', 'inv_bd_impact', 'str_impact', 'pot_impact'].forEach((key) => {
       if (Number(site[key]) > 1.5) site[key] /= 100;
     });

@@ -31,3 +31,7 @@ export const SITE_COLUMNS = [
   ['bd_txt', 'Inverter Breakdown', 'text'], ['str_txt', 'String Anomaly', 'text'],
   ['mppt_txt', 'MPPT Voltage Anomaly', 'text'], ['comms_txt', 'Communication Issue', 'text'],
 ];
+
+// Fixed dispatch (repair) cost applied to every site in the ROI card.
+// Change this one value to update payback for the whole portfolio.
+export const DISPATCH_COST = 2000;

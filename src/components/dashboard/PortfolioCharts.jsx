@@ -15,6 +15,7 @@ export default function PortfolioCharts({ sites, onSiteClick, onImpactedSiteClic
     color: theme.palette.text.secondary,
     plugins: { legend: { display: true, labels: { color: theme.palette.text.secondary } } },
     scales: { x: { ...axis, beginAtZero: true, stacked: true }, y: { ...axis, grid: { display: false }, stacked: true } },
+    datasets: { bar: { barPercentage: 0.62, categoryPercentage: 0.72 } },
     onClick: (_, elements) => elements[0] && onImpactedSiteClick(impacted[elements[0].index].site),
     onHover: (event, elements) => { if (event.native?.target) event.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
   };
@@ -25,7 +26,7 @@ export default function PortfolioCharts({ sites, onSiteClick, onImpactedSiteClic
     </Box>
     <Card id="top-impacted-sites" tabIndex={-1} sx={{ p: 1.75, scrollMarginTop: { xs: '140px', lg: '90px' }, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <SectionHeader color="secondary.main" title="Top 10 Impacted Sites — Total Impact %" subtitle="Click a bar for the site’s detailed impact" />
-      <Box sx={{ flex: 1, minHeight: { xs: 360, lg: 520 }, position: 'relative' }}>
+      <Box sx={{ flex: 1, minHeight: { xs: 300, lg: 420 }, position: 'relative' }}>
         <Bar data={{ labels: impacted.map(({ site }) => site.site.slice(0, 36)), datasets: [
           { label: 'Breakdown %', data: impacted.map(({ bd }) => bd * 100), backgroundColor: COLORS.warn, borderRadius: 2 },
           { label: 'String %', data: impacted.map(({ string }) => string * 100), backgroundColor: COLORS.bad, borderRadius: 2 },

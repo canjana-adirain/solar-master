@@ -16,42 +16,28 @@ const failureColumns = [
 
 function FailureValue({ value, color }) {
   const count = Number(value) || 0;
-  if (!count) {
-    return <Chip size="small" label="—" variant="outlined" sx={{ height: 22, minWidth: 34, color: 'text.disabled', borderColor: 'divider' }} />;
-  }
+  if (!count) return <Chip size="small" label="—" variant="outlined" sx={{ height: 22, minWidth: 34, color: 'text.disabled', borderColor: 'divider' }} />;
   return <Chip size="small" label={count} sx={{ height: 22, minWidth: 34, bgcolor: `${color}28`, color, border: `1px solid ${color}66`, fontWeight: 900 }} />;
 }
 
 export default function EquipmentFailureTable({ sites, roundName, onSiteClick }) {
   const tableRef = useRef(null);
   const rows = useMemo(() => [...sites].sort((left, right) => {
-    const total = (site) => failureColumns.reduce((sum, column) => sum + (Number(site[column.key]) || 0), 0);
+    const total = (site) => failureColumns.reduce((acc, column) => acc + (Number(site[column.key]) || 0), 0);
     return total(right) - total(left) || left.site.localeCompare(right.site);
   }), [sites]);
-
   const exportExcel = () => exportWorkbook(
     `Sites by equipment failure · ${roundName}`,
     ['Site', ...failureColumns.map((column) => column.label)],
     rows.map((site) => [site.site, ...failureColumns.map((column) => Number(site[column.key]) || 0)]),
     `Sites_by_equipment_failure_${roundName}`,
   );
-
-  const exportPdf = () => exportElementPdf(
-    tableRef.current,
-    `Sites_by_equipment_failure_${roundName}`,
-    `Sites by equipment failure · ${roundName}`,
-  );
-
+  const exportPdf = () => exportElementPdf(tableRef.current, `Sites_by_equipment_failure_${roundName}`, `Sites by equipment failure · ${roundName}`);
   return (
-    <Card sx={{ p: 1.75, mb: 1.5 }}>
-      <SectionHeader
-        color="warning.main"
-        title="Sites by equipment failure"
-        subtitle="One row per filtered site — flags show active failure types"
-        action={<DownloadButtons onExcel={exportExcel} onPdf={exportPdf} />}
-      />
-      <TableContainer ref={tableRef} sx={{ maxHeight: 420, border: 1, borderColor: 'divider', borderRadius: 1.5 }}>
-        <Table stickyHeader size="small" sx={{ minWidth: 620 }}>
+    <Card sx={{ p: 1.25, height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <SectionHeader color="warning.main" title="Sites by equipment failure" subtitle="One row per filtered site — active failure types only" action={<DownloadButtons compact onExcel={exportExcel} onPdf={exportPdf} />} />
+      <TableContainer ref={tableRef} sx={{ flex: 1, minHeight: 0, maxHeight: 470, border: 1, borderColor: 'divider', borderRadius: 1.5 }}>
+        <Table stickyHeader size="small" sx={{ minWidth: 460 }}>
           <TableHead>
             <TableRow>
               <TableCell sx={{ color: 'primary.light', fontWeight: 900 }}>Site</TableCell>
@@ -60,16 +46,10 @@ export default function EquipmentFailureTable({ sites, roundName, onSiteClick })
           </TableHead>
           <TableBody>
             {rows.map((site) => (
-              <TableRow
-                hover key={site.site}
-                onClick={() => onSiteClick?.(site)}
-                sx={{ cursor: onSiteClick ? 'pointer' : 'default' }}
-              >
+              <TableRow hover key={site.site} onClick={() => onSiteClick?.(site)} sx={{ cursor: onSiteClick ? 'pointer' : 'default' }}>
                 <TableCell><Typography variant="body2" fontWeight={600}>{site.site}</Typography></TableCell>
                 {failureColumns.map((column) => (
-                  <TableCell key={column.key} align="center">
-                    <FailureValue value={site[column.key]} color={column.color} />
-                  </TableCell>
+                  <TableCell key={column.key} align="center"><FailureValue value={site[column.key]} color={column.color} /></TableCell>
                 ))}
               </TableRow>
             ))}
