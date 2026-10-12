@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { COLORS } from '../../constants.js';
-import { effectiveImpact } from '../../utils/analytics.js';
+import { effectiveImpact, activeCommunicationIssues } from '../../utils/analytics.js';
 import { exportWorkbook } from '../../utils/export.js';
 import { cleanText, formatNumber, formatPercent, safeFilename } from '../../utils/format.js';
 
@@ -19,7 +19,7 @@ export function impactValue(site, config) {
 
 export function siteIssueCount(site, config) {
   if (config === impactTypes.bd && Array.isArray(site.breakdownInverters)) return site.breakdownInverters.length;
-  if (config === impactTypes.comms && Array.isArray(site.communicationIssues)) return site.communicationIssues.length;
+  if (config === impactTypes.comms && Array.isArray(site.communicationIssues)) return activeCommunicationIssues(site).length;
   return Number(site[config.key]) || 0;
 }
 
@@ -28,10 +28,10 @@ export function issueItems(site, config) {
     return site.breakdownInverters.map((item) => ({ text: String(item.name || 'Inverter'), impact: Number(item.impact) > 0 ? Number(item.impact) : null }));
   }
   if (config === impactTypes.comms && Array.isArray(site.communicationIssues) && site.communicationIssues.length) {
-    return site.communicationIssues.map((item) => ({ text: String(item.text || 'Communication issue'), impact: Number(item.impact) > 0 ? Number(item.impact) : null }));
+    return activeCommunicationIssues(site).map((item) => ({ text: String(item.text || 'Communication issue'), impact: Number(item.impact) > 0 ? Number(item.impact) : null }));
   }
   const raw = config.textKey ? cleanText(site[config.textKey]) : '';
-  return raw ? raw.split(/\s*\|\s*|\r?\n/).map((text) => ({ text: text.trim().replace(/\s+is under breakdown\s*$/i, ''), impact: null })).filter((item) => item.text) : [];
+  return raw ? raw.split(/\s*\|\s*|\r?\n/).filter((text) => config !== impactTypes.comms || !/\b(?:restored|resolved|rectified|recovered|now communicating|communication restored|back online|fixed)\b/i.test(text)).map((text) => ({ text: text.trim().replace(/\s+is under breakdown\s*$/i, ''), impact: null })).filter((item) => item.text) : [];
 }
 
 export function impactSummary(sites, config) {

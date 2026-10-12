@@ -15,6 +15,19 @@ export function siteStringAvailability(site) {
     : Math.max(0, 1 - (Number(site.str_impact) || 0));
 }
 
+// Keep only currently active communications. Historical/restored entries must not
+// be counted as active, even when the spreadsheet's aggregate includes them.
+const inactiveIssue = /\b(?:restored|resolved|rectified|recovered|now communicating|communication restored|back online|fixed)\b/i;
+export function activeCommunicationIssues(site) {
+  if (Array.isArray(site.communicationIssues)) return site.communicationIssues.filter((entry) =>
+    !inactiveIssue.test(String(entry?.text || entry?.name || entry?.status || '')) &&
+    !['restored', 'resolved', 'inactive', 'closed'].includes(String(entry?.status || '').toLowerCase()));
+  const description = String(site.comms_txt || '').trim();
+  if (!description || /^(?:no comm\.? issue|no issue|no anomaly)$/i.test(description)) return [];
+  return description.split(/\s*\|\s*|\r?\n/).map((text) => text.trim())
+    .filter((text) => text && !inactiveIssue.test(text));
+}
+
 export function normalizeSites(sites = []) {
   return sites.map((site) => {
     const normalized = { ...site };
@@ -22,9 +35,26 @@ export function normalizeSites(sites = []) {
       normalized.bd_cnt = site.breakdownInverters.length;
       normalized.inv_bd_impact = Math.min(1, site.breakdownInverters.reduce((total, item) => total + (Number(item.impact) || 0), 0));
     }
+    const issues = activeCommunicationIssues(site);
     if (Array.isArray(site.communicationIssues)) {
-      normalized.comms_cnt = site.communicationIssues.length;
-      normalized.pot_impact = Math.min(1, site.communicationIssues.reduce((total, item) => total + (Number(item.impact) || 0), 0));
+      normalized.communicationIssues = issues;
+      normalized.comms_cnt = issues.length;
+      normalized.pot_impact = Math.min(1, issues.reduce((total, item) => total + (Number(item.impact) || 0), 0));
+    } else if (String(site.comms_txt || '').trim() && issues.length) {
+      // An issue may describe several inverters (e.g. "Inv 1-5"). The count
+      // column remains authoritative unless restored records are present.
+      const fullText = String(site.comms_txt);
+      if (/\b(?:restored|resolved|rectified|recovered|now communicating|communication restored|back online|fixed)\b/i.test(fullText)) {
+        normalized.comms_cnt = issues.reduce((sum, text) => {
+          const match = text.match(/\binv(?:erter)?\s*(\d+)\s*[-–]\s*(\d+)/i);
+          return sum + (match ? Math.max(1, Number(match[2]) - Number(match[1]) + 1) : 1);
+        }, 0);
+        // Fall back to active inverter share when detailed inverter impacts are unavailable.
+        normalized.pot_impact = normalized.tot_inv > 0 ? Math.min(1, normalized.comms_cnt / normalized.tot_inv) : 0;
+      }
+    } else if (String(site.comms_txt || '').trim() && !issues.length && /\b(?:restored|resolved|rectified|recovered|now communicating|communication restored|back online|fixed)\b/i.test(site.comms_txt)) {
+      normalized.comms_cnt = 0;
+      normalized.pot_impact = 0;
     }
     return normalized;
   });
@@ -35,7 +65,7 @@ export const activeBreakdownCount = (site) => Array.isArray(site.breakdownInvert
   : Number(site.bd_cnt) || 0;
 
 export const activeCommunicationCount = (site) => Array.isArray(site.communicationIssues)
-  ? site.communicationIssues.length
+  ? activeCommunicationIssues(site).length
   : Number(site.comms_cnt) || 0;
 
 export const average = (sites, key) => {

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import FilterAltRoundedIcon from '@mui/icons-material/FilterAltRounded';
 import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded';
@@ -57,7 +58,7 @@ function SiteDetail({ site, showImpact = false }) {
         {issues.map(([label, value, color]) => {
           const text = cleanText(value);
           if (!text) return null;
-          const lines = text.split(/\s*\|\s*|\r?\n/).map((line) => line.trim()).filter(Boolean);
+          const lines = text.split('|').flatMap((part) => part.split('\n')).map((line) => line.trim()).filter(Boolean);
           return (
             <Box key={label} sx={{ p: 1.25, border: 1, borderColor: 'divider', borderRadius: 1.5, bgcolor: 'action.hover' }}>
               <Typography variant="caption" fontWeight={900} sx={{ color }}>{label}</Typography>
@@ -72,6 +73,53 @@ function SiteDetail({ site, showImpact = false }) {
   );
 }
 
+
+// Compact, chart-specific popup used by "Top 10 Impacted Sites" only.
+function ImpactedSiteDetail({ site }) {
+  const breakdown = effectiveImpact(site, 'bd_cnt', 'inv_bd_impact');
+  const string = effectiveImpact(site, 'str_cnt', 'str_impact');
+  const comms = effectiveImpact(site, 'comms_cnt', 'pot_impact');
+  const total = breakdown + string + comms;
+  const issueSections = [
+    ['Inverter Breakdown', site.bd_txt, COLORS.warn],
+    ['String Anomaly', site.str_txt, COLORS.bad],
+    ['Communication Issue (active)', site.comms_txt, COLORS.cyan],
+  ].map(([label, value, color]) => ({ label, color, lines: cleanText(value).split(/\s*\|\s*|\r?\n/).map((entry) => entry.trim()).filter(Boolean) }))
+    .filter(({ lines }) => lines.length);
+  return (
+    <>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1, mb: 1.3 }}>
+        {[
+          ['ACTUAL/EXP', formatPercent(site.ae), COLORS.accent],
+          ['GRADE', site.grade ?? '—', 'text.primary'],
+          ['TOTAL IMPACT', formatPercent(total), COLORS.warn],
+        ].map(([label, value, color]) => <Box key={label} sx={{ border: 1, borderColor: 'divider', borderRadius: 1.5, p: 1.2 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{label}</Typography>
+          <Typography fontWeight={900} sx={{ fontSize: 22, color }}>{value}</Typography>
+        </Box>)}
+      </Box>
+      <Box sx={{ p: 1.4, border: 1, borderColor: 'divider', borderRadius: 1.5, bgcolor: 'action.hover' }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+          <Typography fontWeight={850}>{site.site}</Typography>
+          <Typography fontWeight={900} sx={{ color: COLORS.accent }}>{formatPercent(site.ae)}</Typography>
+        </Stack>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.3 }}>
+          Rank {formatNumber(site.rank)} · DC {formatNumber(site.dc)} kW · AC {formatNumber(site.ac)} kW · INV/PM {site.invpm_status || '—'} · Inverters {formatNumber(site.tot_inv)}
+        </Typography>
+        <Box sx={{ display: 'inline-block', mt: 0.7, px: 1, py: 0.4, borderRadius: 1, border: `1px solid ${COLORS.warn}80`, color: COLORS.warn, fontSize: 12, fontWeight: 800 }}>
+          Breakdown {formatPercent(breakdown)} · String {formatPercent(string)} · Comms {formatPercent(comms)}
+        </Box>
+        {issueSections.map(({ label, color, lines }) => <Box key={label} sx={{ mt: 1 }}>
+          <Typography variant="caption" sx={{ color, fontWeight: 800 }}>{label}</Typography>
+          <Stack spacing={0.5} sx={{ mt: 0.4 }}>
+            {lines.map((line, index) => <Typography key={index} variant="body2" sx={{ pl: 1.1, borderLeft: `3px solid ${color}`, overflowWrap: 'anywhere' }}>▸ {line}</Typography>)}
+          </Stack>
+        </Box>)}
+      </Box>
+    </>
+  );
+}
+
 // ---- System Health popups (DSD / Adirain / Data / Inverter) -----------------
 const HEALTH_META = {
   dsd: { color: COLORS.accent, label: 'DSD' },
@@ -79,6 +127,75 @@ const HEALTH_META = {
   data: { color: COLORS.purple, label: 'Data' },
   inverter: { color: COLORS.cyan, label: 'Inverter' },
 };
+
+const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
+const availabilityColor = (value) => (value >= 0.95 ? COLORS.good : value >= 0.9 ? COLORS.warn : COLORS.bad);
+const EXPANDABLE_HEALTH_KINDS = new Set(['adirain', 'data', 'inverter']);
+
+function parseInverterNumbers(text, totalInverters = 0) {
+  const value = cleanText(text);
+  if (!value) return [];
+  const ids = new Set();
+  const regex = /inv(?:erter)?\.?\s*(\d+)(?:\s*[-–]\s*(\d+))?/gi;
+  let match = regex.exec(value);
+  while (match) {
+    const start = Number(match[1]) || 0;
+    const rawEnd = Number(match[2]) || start;
+    const end = totalInverters ? Math.min(rawEnd, totalInverters) : rawEnd;
+    for (let current = start; current <= end; current += 1) ids.add(current);
+    match = regex.exec(value);
+  }
+  return [...ids].filter((id) => id > 0).sort((a, b) => a - b);
+}
+
+function buildAvailabilityRows(totalInverters, siteAvailability, affectedInverters = []) {
+  const total = Math.max(0, Math.round(Number(totalInverters) || 0));
+  if (!total) return [];
+  const availability = clamp01(siteAvailability);
+  const impacted = [...new Set((affectedInverters || []).filter((id) => id >= 1 && id <= total))].sort((a, b) => a - b);
+  if (!impacted.length) {
+    return Array.from({ length: total }, (_, index) => ({ label: `INV ${index + 1}`, value: availability }));
+  }
+  const normalCount = total - impacted.length;
+  const impactedValue = clamp01((availability * total - normalCount) / impacted.length);
+  return Array.from({ length: total }, (_, index) => {
+    const inverterNumber = index + 1;
+    return { label: `INV ${inverterNumber}`, value: impacted.includes(inverterNumber) ? impactedValue : 1 };
+  });
+}
+
+function inverterWiseHealthRows(site, kind) {
+  if (kind === 'data') {
+    return buildAvailabilityRows(site.tot_inv, healthValue(site, 'data'), parseInverterNumbers(site.comms_txt, site.tot_inv));
+  }
+  if (kind === 'inverter') {
+    return buildAvailabilityRows(site.tot_inv, healthValue(site, 'inverter'), parseInverterNumbers(site.bd_txt, site.tot_inv));
+  }
+  return [];
+}
+
+function AvailabilityBreakdown({ rows, sourceText }) {
+  const note = cleanText(sourceText);
+  return (
+    <Box sx={{ mt: 1.1, pt: 1, borderTop: 1, borderColor: 'divider' }}>
+      <Stack spacing={0.8}>
+        {rows.map(({ label, value }) => {
+          const color = availabilityColor(value);
+          return (
+            <Box key={label} sx={{ display: 'grid', gridTemplateColumns: 'minmax(96px, 140px) 1fr auto', gap: 1, alignItems: 'center' }}>
+              <Typography variant="body2" fontWeight={700}>{label}</Typography>
+              <Box sx={{ height: 8, borderRadius: 999, overflow: 'hidden', bgcolor: 'rgba(255,255,255,0.08)' }}>
+                <Box sx={{ width: `${clamp01(value) * 100}%`, height: '100%', bgcolor: color, borderRadius: 999 }} />
+              </Box>
+              <Typography variant="body2" fontWeight={900} sx={{ color, minWidth: 56, textAlign: 'right' }}>{formatPercent(value)}</Typography>
+            </Box>
+          );
+        })}
+      </Stack>
+      {note && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.9 }}>{note}</Typography>}
+    </Box>
+  );
+}
 
 export function healthValue(site, kind) {
   const string = siteStringAvailability(site);
@@ -103,33 +220,45 @@ function healthMetrics(site, kind) {
 
 function HealthDetails({ sites, kind }) {
   const color = HEALTH_META[kind]?.color || COLORS.accent;
+  const [expandedSite, setExpandedSite] = useState(null);
+  const isExpandable = EXPANDABLE_HEALTH_KINDS.has(kind);
   return (
     <Stack spacing={0.8}>
       {sites.length ? sites.map((site, index) => {
-        const metrics = healthMetrics(site, kind);
-        const main = metrics[0][1];
+        const availability = healthValue(site, kind);
+        const isAdirain = kind === 'adirain';
+        const isExpanded = expandedSite === index;
+        const perInverterRows = isAdirain ? [] : inverterWiseHealthRows(site, kind);
+        const sourceText = kind === 'data' ? site.comms_txt : kind === 'inverter' ? site.bd_txt : '';
         return (
-          <Box key={`${site.site}-${index}`} sx={{ p: 1, border: 1, borderColor: 'divider', borderRadius: 1.5, bgcolor: 'action.hover' }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} gap={1}>
-              <Chip size="small" label={`#${index + 1}`} sx={{ fontWeight: 900, alignSelf: { xs: 'flex-start', sm: 'center' } }} />
-              <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Typography fontWeight={850} sx={{ fontSize: 14 }}>{site.site}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {formatNumber(site.tot_inv)} inverters checked · {formatNumber(site.total_strings)} configured strings · {formatNumber(site.str_cnt)} strings down · DC {formatNumber(site.dc)} kW
+          <Box key={`${site.site}-${index}`} sx={{ p: 1.1, border: 1, borderColor: 'divider', borderRadius: 1.5, bgcolor: 'action.hover' }}>
+            <Box
+              onClick={isExpandable ? () => setExpandedSite(isExpanded ? null : index) : undefined}
+              onKeyDown={isExpandable ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setExpandedSite(isExpanded ? null : index); } } : undefined}
+              role={isExpandable ? 'button' : undefined}
+              tabIndex={isExpandable ? 0 : undefined}
+              aria-expanded={isExpandable ? isExpanded : undefined}
+              sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, cursor: isExpandable ? 'pointer' : 'default' }}
+            >
+              <Box sx={{ minWidth: 0 }}>
+                <Typography fontWeight={850} sx={{ fontSize: 14 }}>
+                  {isExpandable ? (isExpanded ? '▾ ' : '▸ ') : ''}
+                  {site.site}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.3 }}>
+                  {kind === 'dsd' ? `Rank ${formatNumber(site.rank)} · DC ${formatNumber(site.dc)} kW · Grade ${site.grade ?? '—'}` : `Inverters ${formatNumber(site.tot_inv)} · DC ${formatNumber(site.dc)} kW · Grade ${site.grade ?? '—'}`}
                 </Typography>
               </Box>
-              <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${metrics.length}, minmax(70px, 1fr))`, gap: 0.6, width: { xs: '100%', sm: 'auto' } }}>
-                {metrics.map(([label, value, metricColor]) => (
-                  <Box key={label} sx={{ px: 0.8, py: 0.4, textAlign: 'center', border: `1px solid ${metricColor}66`, borderRadius: 1 }}>
-                    <Typography sx={{ fontSize: 9.5, color: 'text.secondary', fontWeight: 700 }}>{label}</Typography>
-                    <Typography fontWeight={900} sx={{ fontSize: 13, color: metricColor }}>{formatPercent(value)}</Typography>
-                  </Box>
+              <Typography fontWeight={900} sx={{ color, whiteSpace: 'nowrap' }}>{formatPercent(availability)}</Typography>
+            </Box>
+            {isAdirain && isExpanded && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.1, pt: 1, borderTop: 1, borderColor: 'divider' }}>
+                {healthMetrics(site, kind).slice(1).map(([label, value, metricColor]) => (
+                  <Chip key={label} size="small" variant="outlined" label={`${label}: ${formatPercent(value)}`} sx={{ color: metricColor, borderColor: metricColor }} />
                 ))}
               </Box>
-            </Stack>
-            <Box sx={{ mt: 0.7, height: 4, borderRadius: 2, bgcolor: 'rgba(148,163,184,.2)', overflow: 'hidden' }}>
-              <Box sx={{ width: `${Math.min(100, main * 100)}%`, height: '100%', bgcolor: color }} />
-            </Box>
+            )}
+            {!isAdirain && isExpanded && perInverterRows.length > 0 && <AvailabilityBreakdown rows={perInverterRows} sourceText={sourceText} />}
           </Box>
         );
       }) : <Typography color="text.secondary" align="center" sx={{ py: 5 }}>No sites match this detail.</Typography>}
@@ -195,7 +324,8 @@ export default function DetailsDialog({ detail, onClose, onFilter }) {
   const isString = detail?.kind === 'stringAvailability';
   const isHealth = detail?.kind === 'health';
   const isRoi = detail?.kind === 'roi';
-  const impactConfig = detail?.kind === 'impact' ? impactTypes[detail.impactKey] : null;
+  const isImpactedSite = detail?.kind === 'impactedSite';
+  const impactConfig = (detail?.kind === 'impact' || detail?.kind === 'leaderImpact') ? impactTypes[detail.impactKey] : null;
   return (
     <Dialog open={Boolean(detail)} onClose={onClose} fullWidth maxWidth={impactConfig || isHealth ? 'lg' : 'md'} scroll="paper" aria-labelledby="details-title">
       {detail && (
@@ -212,6 +342,7 @@ export default function DetailsDialog({ detail, onClose, onFilter }) {
           <DialogContent dividers>
             {isRoi ? <RoiDetail row={detail.roi} />
               : impactConfig ? <ImpactDetails sites={sites} config={impactConfig} />
+              : isImpactedSite ? <ImpactedSiteDetail site={sites[0]} />
               : isString ? <StringAvailabilityDetails sites={sites} />
                 : isHealth ? <HealthDetails sites={sites} kind={detail.healthKind} />
                   : sites.length === 1 && (detail.kind === 'site' || detail.kind === 'impactedSite') ? <SiteDetail site={sites[0]} showImpact={detail.kind === 'impactedSite'} />
@@ -224,7 +355,9 @@ export default function DetailsDialog({ detail, onClose, onFilter }) {
                               <Box sx={{ flex: 1, minWidth: 0 }}>
                                 <Typography fontWeight={800}>{site.site}</Typography>
                                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.2 }}>
-                                  {detail.compactView
+                                  {detail.kind === 'allSites'
+                                    ? <>Actual/Exp {formatPercent(site.ae)} · DSD Avail {formatPercent(site.dsd)} · AC {formatNumber(site.ac)} kW · Inverters {formatNumber(site.tot_inv)} · INV/PM {site.invpm_status || '—'}</>
+                                    : detail.compactView
                                     ? <>Rank {formatNumber(site.rank)} · DC {formatNumber(site.dc)} kW · Grade {site.grade ?? '—'}</>
                                     : <>Actual/Exp {formatPercent(site.ae)} · DSD Avail {formatPercent(site.dsd)} · DC {formatNumber(site.dc)} kW · Inverters {formatNumber(site.tot_inv)} · INV/PM {site.invpm_status || '—'}</>}
                                 </Typography>

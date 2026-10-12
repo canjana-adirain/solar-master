@@ -83,8 +83,9 @@ export default function DashboardPage({ sites: rawSites, previousSites: rawPrevi
   }, [previousSites, selected]);
   const previousSummary = useMemo(() => (previousVisibleSites ? summarizePortfolio(previousVisibleSites) : null), [previousVisibleSites]);
 
+  const openLeaderSite = (site, impactKey) => setDetail({ kind: 'leaderImpact', title: `${site.site} · ${anomalyConfig[impactKey]?.title || 'Impact'}`, subtitle: 'Relevant issue details for the selected category.', sites: [site], impactKey });
   const openSite = (site) => setDetail({ kind: 'site', title: site.site, subtitle: 'Complete site performance and issue details.', sites: [site] });
-  const openImpactedSite = (site) => setDetail({ kind: 'impactedSite', title: site.site, subtitle: 'Impact breakdown and equipment issues for this site.', sites: [site] });
+  const openImpactedSite = (site) => setDetail({ kind: 'impactedSite', title: `${site.site} (Impacted)`, subtitle: 'Site detail for the selected bar.', sites: [site] });
   const openRoi = (row) => setDetail({ kind: 'roi', title: row.site.site, subtitle: 'Dispatch ROI — payback details for this site.', sites: [row.site], roi: row });
   const setSiteFilter = (list) => { onSelectedChange?.(list.map((site) => site.site)); setDetail(null); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const openList = (title, list, valueFor, subtitle, extra = {}) => setDetail({ title, subtitle: subtitle || `${list.length} site${list.length === 1 ? '' : 's'} in the current selection.`, sites: list, valueFor, ...extra });
@@ -97,7 +98,7 @@ export default function DashboardPage({ sites: rawSites, previousSites: rawPrevi
       inverters: ['Inverters by Site', () => [...visibleSites].sort((a, b) => b.tot_inv - a.tot_inv), (site) => formatNumber(site.tot_inv)],
       strings: ['String Count by Site', () => [...visibleSites].sort((a, b) => (b.total_strings || b.str_cnt) - (a.total_strings || a.str_cnt)), (site) => formatNumber(site.total_strings || site.str_cnt)],
     }[kind];
-    openList(config[0], config[1](), config[2], config[3]);
+    openList(config[0], config[1](), config[2], config[3], kind === 'sites' ? { kind: 'allSites' } : {});
   };
 
   const openGrade = (grade) => openList(
@@ -129,7 +130,7 @@ export default function DashboardPage({ sites: rawSites, previousSites: rawPrevi
       config[0],
       list,
       (site) => formatPercent(config[1](site)),
-      kind === 'string' ? 'Per-site string availability = (configured − down) ÷ configured strings, with an inverter-wise breakdown.' : 'Lowest availability is shown first.',
+      kind === 'string' ? '(Configured − down) ÷ configured strings. Click a site to see inverter-wise string availability.' : kind === 'adirain' ? 'Composite = Data × Inverter × String availability. Click a site to see its breakdown.' : (kind === 'data' || kind === 'inverter') ? 'Every site ranked by availability; lowest availability is shown first. Click a site to see inverter-wise availability.' : 'Every site ranked by availability; lowest availability is shown first.',
       { compactView: kind !== 'string', kind: kind === 'string' ? 'stringAvailability' : 'health', healthKind: kind },
     );
   };
@@ -162,9 +163,9 @@ export default function DashboardPage({ sites: rawSites, previousSites: rawPrevi
         <Box id="inv-pm-health" tabIndex={-1} sx={sectionStyle}><InvPmHealth sites={visibleSites} summary={summary} onStatusClick={openStatus} /></Box>
       </Box>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1fr 1fr' }, gap: 1.25, mb: 1.25 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) minmax(0, 1fr)' }, gap: 1.25, mb: 1.25 }}>
         <Box id="production-impact" tabIndex={-1} sx={sectionStyle}><ProductionImpact summary={summary} onMetricClick={openImpact} onExcel={exportImpact} onPdf={(element) => exportElementPdf(element, `ProductionImpact_${roundName}`, `Production Impact · ${roundName}`)} /></Box>
-        <Box id="impact-leaders" tabIndex={-1} sx={sectionStyle}><ImpactLeaders sites={visibleSites} onSiteClick={openSite} onExcel={exportLeaders} onPdf={(element) => exportElementPdf(element, `TopImpacted_${roundName}`, `Top Impacted Sites · ${roundName}`)} /></Box>
+        <Box id="impact-leaders" tabIndex={-1} sx={sectionStyle}><ImpactLeaders sites={visibleSites} onSiteClick={openLeaderSite} onExcel={exportLeaders} onPdf={(element) => exportElementPdf(element, `TopImpacted_${roundName}`, `Top Impacted Sites · ${roundName}`)} /></Box>
       </Box>
 
       <PortfolioCharts sites={visibleSites} onSiteClick={openSite} onImpactedSiteClick={openImpactedSite} />
