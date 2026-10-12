@@ -4,7 +4,7 @@ import DeveloperBoardRoundedIcon from '@mui/icons-material/DeveloperBoardRounded
 import SecurityRoundedIcon from '@mui/icons-material/SecurityRounded';
 import { Box, Card, CardActionArea, LinearProgress, Stack, Typography } from '@mui/material';
 import { COLORS } from '../../constants.js';
-import { formatNumber, formatPercent } from '../../utils/format.js';
+import { formatPercent } from '../../utils/format.js';
 import SectionHeader from '../common/SectionHeader.jsx';
 
 const clamp = (value) => Math.max(0, Math.min(100, (Number(value) || 0) * 100));
@@ -51,7 +51,7 @@ function Gauge({ value }) {
   );
 }
 
-function ChildCard({ title, value, previous, color, icon: Icon, description, countText, onClick }) {
+function ChildCard({ title, value, previous, color, icon: Icon, description, onClick }) {
   return (
     <CardActionArea
       onClick={onClick}
@@ -66,7 +66,6 @@ function ChildCard({ title, value, previous, color, icon: Icon, description, cou
       <Typography sx={{ fontSize: 9.5, color: 'text.secondary', textAlign: 'center', mb: 0.6 }}>{comparison(value, previous)}</Typography>
       <Progress value={value} color={color} />
       <Typography sx={{ mt: 0.5, fontSize: 10, color: 'text.secondary', lineHeight: 1.3 }}>{description}</Typography>
-      <Typography sx={{ mt: 0.3, fontSize: 10, fontWeight: 800, color }}>{countText}</Typography>
     </CardActionArea>
   );
 }
@@ -100,7 +99,6 @@ export default function HealthCard({ summary, previousSummary = null, onMetricCl
             <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.3, lineHeight: 1.3 }}>Composite availability derived from Data, Inverter and String availability.</Typography>
             <Box sx={{ width: 32, height: 2.5, bgcolor: COLORS.good, borderRadius: 3, my: 0.8 }} />
             <Typography sx={{ fontSize: 10.5, color: 'text.secondary' }}>👆 Click to know more</Typography>
-            <Typography sx={{ mt: 0.3, fontSize: 10, color: COLORS.good, fontWeight: 800 }}>{formatNumber(summary.inverters)} inverters · {formatNumber(summary.strings)} strings checked</Typography>
           </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <Gauge value={summary.adirainAvailability} />
@@ -118,9 +116,9 @@ export default function HealthCard({ summary, previousSummary = null, onMetricCl
 
       {/* Children */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0,1fr))' }, gap: 1.15, mt: { xs: 0.9, sm: 0 }, flex: 1 }}>
-        <ChildCard title="Data Avail." value={summary.dataAvailability} previous={previousSummary?.dataAvailability} color={COLORS.purple} icon={DataUsageRoundedIcon} description="Expected data points received after QC" countText={`${formatNumber(summary.inverters)} inverters checked`} onClick={() => onMetricClick('data')} />
-        <ChildCard title="Inverter Avail." value={summary.inverterAvailability} previous={previousSummary?.inverterAvailability} color={COLORS.cyan} icon={DeveloperBoardRoundedIcon} description="Inverter operational uptime across the fleet" countText={`${formatNumber(summary.inverters)} inverters checked`} onClick={() => onMetricClick('inverter')} />
-        <ChildCard title="String Avail." value={summary.stringAvailability} previous={previousSummary?.stringAvailability} color={COLORS.warn} icon={CableRoundedIcon} description="Strings up vs. configured strings" countText={`${formatNumber(summary.strings)} configured strings`} onClick={() => onMetricClick('string')} />
+        <ChildCard title="Data Avail." value={summary.dataAvailability} previous={previousSummary?.dataAvailability} color={COLORS.purple} icon={DataUsageRoundedIcon} description="Expected data points received after QC" onClick={() => onMetricClick('data')} />
+        <ChildCard title="Inverter Avail." value={summary.inverterAvailability} previous={previousSummary?.inverterAvailability} color={COLORS.cyan} icon={DeveloperBoardRoundedIcon} description="Inverter operational uptime across the fleet" onClick={() => onMetricClick('inverter')} />
+        <ChildCard title="String Avail." value={summary.stringAvailability} previous={previousSummary?.stringAvailability} color={COLORS.warn} icon={CableRoundedIcon} description="Strings up vs. configured strings" onClick={() => onMetricClick('string')} />
       </Box>
     </Card>
   );
