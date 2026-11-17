@@ -1,0 +1,181 @@
+const finiteValues = (sites, key) => sites.map((site) => Number(site[key])).filter(Number.isFinite);
+
+export const isHealthyInvPm = (site) => {
+  const ratio = Number(site.invpm);
+  return Number.isFinite(ratio) && ratio >= 0.95 && ratio <= 1.05;
+};
+
+export const sum = (sites, key) => sites.reduce((total, site) => total + (Number(site[key]) || 0), 0);
+
+export function siteStringAvailability(site) {
+  const totalStrings = Number(site.total_strings) || 0;
+  const stringsDown = Math.max(0, Number(site.str_cnt) || 0);
+  return totalStrings > 0
+    ? Math.max(0, 1 - stringsDown / totalStrings)
+    : Math.max(0, 1 - (Number(site.str_impact) || 0));
+}
+
+// Keep only currently active communications. Historical/restored entries must not
+// be counted as active, even when the spreadsheet's aggregate includes them.
+const inactiveIssue = /\b(?:restored|resolved|rectified|recovered|now communicating|communication restored|back online|fixed)\b/i;
+export const isResolvedBreakdown = (entry) => {
+  const status = String(entry?.status || '').toLowerCase();
+  const text = String(entry?.text || entry?.name || '');
+  return ['restored', 'resolved', 'inactive', 'closed'].includes(status) || inactiveIssue.test(text);
+};
+export const activeBreakdownIssues = (site) => Array.isArray(site.breakdownInverters)
+  ? site.breakdownInverters.filter((entry) => !isResolvedBreakdown(entry))
+  : [];
+export function activeCommunicationIssues(site) {
+  if (Array.isArray(site.communicationIssues)) return site.communicationIssues.filter((entry) =>
+    !inactiveIssue.test(String(entry?.text || entry?.name || entry?.status || '')) &&
+    !['restored', 'resolved', 'inactive', 'closed'].includes(String(entry?.status || '').toLowerCase()));
+  const description = String(site.comms_txt || '').trim();
+  if (!description || /^(?:no comm\.? issue|no issue|no anomaly)$/i.test(description)) return [];
+  return description.split(/\s*\|\s*|\r?\n/).map((text) => text.trim())
+    .filter((text) => text && !inactiveIssue.test(text));
+}
+
+export function normalizeSites(sites = []) {
+  return sites.map((site) => {
+    const normalized = { ...site };
+    if (Array.isArray(site.breakdownInverters)) {
+      const activeBreakdowns = activeBreakdownIssues(site);
+      normalized.bd_cnt = activeBreakdowns.length;
+      normalized.inv_bd_impact = Math.min(1, activeBreakdowns.reduce((total, item) => total + (Number(item.impact) || 0), 0));
+    }
+    const issues = activeCommunicationIssues(site);
+    if (Array.isArray(site.communicationIssues)) {
+      normalized.communicationIssues = issues;
+      normalized.comms_cnt = issues.length;
+      normalized.pot_impact = Math.min(1, issues.reduce((total, item) => total + (Number(item.impact) || 0), 0));
+    } else if (String(site.comms_txt || '').trim() && issues.length) {
+      // An issue may describe several inverters (e.g. "Inv 1-5"). The count
+      // column remains authoritative unless restored records are present.
+      const fullText = String(site.comms_txt);
+      if (/\b(?:restored|resolved|rectified|recovered|now communicating|communication restored|back online|fixed)\b/i.test(fullText)) {
+        normalized.comms_cnt = issues.reduce((sum, text) => {
+          const match = text.match(/\binv(?:erter)?\s*(\d+)\s*[-–]\s*(\d+)/i);
+          return sum + (match ? Math.max(1, Number(match[2]) - Number(match[1]) + 1) : 1);
+        }, 0);
+        // Fall back to active inverter share when detailed inverter impacts are unavailable.
+        normalized.pot_impact = normalized.tot_inv > 0 ? Math.min(1, normalized.comms_cnt / normalized.tot_inv) : 0;
+      }
+    } else if (String(site.comms_txt || '').trim() && !issues.length && /\b(?:restored|resolved|rectified|recovered|now communicating|communication restored|back online|fixed)\b/i.test(site.comms_txt)) {
+      normalized.comms_cnt = 0;
+      normalized.pot_impact = 0;
+    }
+    return normalized;
+  });
+}
+
+export const activeBreakdownCount = (site) => Array.isArray(site.breakdownInverters)
+  ? activeBreakdownIssues(site).length
+  : Number(site.bd_cnt) || 0;
+
+export const activeCommunicationCount = (site) => Array.isArray(site.communicationIssues)
+  ? activeCommunicationIssues(site).length
+  : Number(site.comms_cnt) || 0;
+
+export const average = (sites, key) => {
+  const values = finiteValues(sites, key);
+  return values.length ? values.reduce((total, value) => total + value, 0) / values.length : 0;
+};
+
+export function effectiveImpact(site, countKey, impactKey) {
+  if (countKey === 'bd_cnt' && Array.isArray(site.breakdownInverters)) {
+    const activeBreakdowns = activeBreakdownIssues(site);
+    const detailImpact = activeBreakdowns.reduce((total, item) => total + (Number(item.impact) || 0), 0);
+    if (detailImpact > 0 || activeBreakdowns.length === 0) return Math.min(1, detailImpact);
+  }
+  if (countKey === 'comms_cnt' && Array.isArray(site.communicationIssues)) {
+    const detailImpact = site.communicationIssues.reduce((total, item) => total + (Number(item.impact) || 0), 0);
+    if (detailImpact > 0 || site.communicationIssues.length === 0) return Math.min(1, detailImpact);
+  }
+  const recorded = Number(site[impactKey]) || 0;
+  if (recorded > 0) return recorded;
+  const total = Number(site.tot_inv) || 0;
+  const affected = countKey === 'bd_cnt' ? activeBreakdownCount(site)
+    : countKey === 'comms_cnt' ? activeCommunicationCount(site) : Number(site[countKey]) || 0;
+  return total > 0 && affected > 0 ? Math.min(1, affected / total) : 0;
+}
+
+export function weightedImpact(sites, countKey, impactKey) {
+  const totals = sites.reduce((acc, site) => {
+    const dc = Number(site.dc) || 0;
+    acc.capacity += dc;
+    acc.impact += effectiveImpact(site, countKey, impactKey) * dc;
+    return acc;
+  }, { capacity: 0, impact: 0 });
+  return totals.capacity ? totals.impact / totals.capacity : 0;
+}
+
+export function summarizePortfolio(sites) {
+  const bdImpact = weightedImpact(sites, 'bd_cnt', 'inv_bd_impact');
+  const stringImpact = weightedImpact(sites, 'str_cnt', 'str_impact');
+  const commsImpact = weightedImpact(sites, 'comms_cnt', 'pot_impact');
+  const totalStrings = sum(sites, 'total_strings');
+  const stringsDown = sum(sites, 'str_cnt');
+  const stringAvailability = totalStrings > 0
+    ? Math.max(0, 1 - stringsDown / totalStrings)
+    : Math.max(0, 1 - stringImpact);
+  const dataAvailability = average(sites, 'data_avail');
+  const inverterAvailability = average(sites, 'inv_avail');
+  const dsd = average(sites, 'dsd');
+  const specificYieldValues = finiteValues(sites, 'specific_yield').filter((value) => value > 0);
+  const specificYield = specificYieldValues.length
+    ? specificYieldValues.reduce((a, b) => a + b, 0) / specificYieldValues.length : 0;
+  const good = sites.filter(isHealthyInvPm).length;
+  const invPmValues = finiteValues(sites, 'invpm').filter((value) => value > 0);
+
+  return {
+    siteCount: sites.length,
+    dc: sum(sites, 'dc'), ac: sum(sites, 'ac'), inverters: sum(sites, 'tot_inv'),
+    strings: totalStrings,
+    dsd, dataAvailability, inverterAvailability, stringAvailability,
+    adirainAvailability: dataAvailability * inverterAvailability * stringAvailability,
+    specificYield,
+    bdImpact, stringImpact, commsImpact,
+    totalImpact: Math.min(1, bdImpact + stringImpact + commsImpact),
+    bdCount: sites.reduce((total, site) => total + activeBreakdownCount(site), 0), stringCount: stringsDown,
+    commsCount: sites.reduce((total, site) => total + activeCommunicationCount(site), 0),
+    mpptCount: sum(sites, 'mppt_cnt'), mpptSpikes: sum(sites, 'mppt_spikes'), spareMppt: sum(sites, 'spare_mppt'),
+    averageActualExpected: average(sites, 'ae'), averageInvPm: invPmValues.length ? invPmValues.reduce((a, b) => a + b, 0) / invPmValues.length : 0,
+    goodInvPm: good, badInvPm: sites.length - good,
+    healthyPercent: sites.length ? Math.round(good / sites.length * 100) : 0,
+  };
+}
+
+export function gradeCounts(sites) {
+  return sites.reduce((counts, site) => {
+    if (counts[site.grade] != null) counts[site.grade] += 1;
+    return counts;
+  }, { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
+}
+
+export const topByCount = (sites, key, limit = 5) => [...sites]
+  .filter((site) => Number(site[key]) > 0)
+  .sort((a, b) => Number(b[key]) - Number(a[key]))
+  .slice(0, limit);
+
+export const topByImpact = (sites, countKey, impactKey, limit = 5) => [...sites]
+  .map((site) => ({ site, value: effectiveImpact(site, countKey, impactKey) }))
+  .filter(({ value }) => value > 0)
+  .sort((a, b) => b.value - a.value)
+  .slice(0, limit);
+
+export function topAndBottomPerformance(sites) {
+  const sorted = [...sites].filter((site) => Number.isFinite(Number(site.ae)))
+    .sort((a, b) => Number(b.ae) - Number(a.ae));
+  return { top: sorted.slice(0, 10), bottom: sorted.slice(-10) };
+}
+
+export function topImpactedSites(sites, limit = 10) {
+  return [...sites].map((site) => ({
+    site,
+    bd: effectiveImpact(site, 'bd_cnt', 'inv_bd_impact'),
+    string: effectiveImpact(site, 'str_cnt', 'str_impact'),
+    comms: effectiveImpact(site, 'comms_cnt', 'pot_impact'),
+  })).map((item) => ({ ...item, total: item.bd + item.string + item.comms }))
+    .filter(({ total }) => total > 0).sort((a, b) => b.total - a.total).slice(0, limit);
+}
