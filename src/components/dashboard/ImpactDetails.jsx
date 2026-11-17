@@ -1,6 +1,6 @@
 import { Box, Stack, Typography } from '@mui/material';
 import { formatNumber, formatPercent } from '../../utils/format.js';
-import { impactSummary, impactValue, issueItems, siteIssueCount } from './impactDetailsData.js';
+import { impactSummary, impactTypes, impactValue, issueItems, siteIssueCount } from './impactDetailsData.js';
 export default function ImpactDetails({ sites, config }) {
   const visibleSites = sites.filter((site) => siteIssueCount(site, config) > 0);
   const summary = impactSummary(visibleSites, config);

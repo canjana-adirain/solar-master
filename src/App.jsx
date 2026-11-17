@@ -54,8 +54,6 @@ export default function App() {
   const [selectedSites, setSelectedSites] = useState([]);
   const [siteSearch, setSiteSearch] = useState('');
   const theme = useMemo(() => makeTheme(mode), [mode]);
-
-  // Client keeps its own round selection, independent of the admin's active round.
   const clientRoundRef = useRef(null);
   useEffect(() => {
     if (session?.role === 'client') clientRoundRef.current = activeRoundId || null;
@@ -75,14 +73,12 @@ export default function App() {
       if (session.role === 'client') {
         const library = Array.isArray(remote.library) ? remote.library : null;
         if (library) {
-          // Sync only the round library; keep the client's own selected round.
           const own = clientRoundRef.current;
           const keepId = own && library.some((round) => round.id === own) ? own : (remote.id || library[0]?.id || null);
           replaceFromCloud(library, keepId);
           clientRoundRef.current = keepId;
-        }
-        // Only fall back to the published round when no round library exists.
-        if (!library || !library.length) {
+          setTransientRound(null);
+        } else {
           setTransientRound(remote.sites?.length ? { name: remote.name || 'Round', sites: remote.sites, dateRange: remote.dateRange || '' } : null);
         }
       }
@@ -96,25 +92,21 @@ export default function App() {
   }, [activeRound, rounds, session?.role]);
 
   const changeView = (next) => setView(next === 'upload' && session?.role !== 'admin' ? 'dashboard' : next);
-
   const projectRound = useCallback((id) => {
     setTransientRound(null);
     selectRound(id);
     setView('dashboard');
   }, [selectRound]);
-
   const addRound = useCallback((data) => {
     setTransientRound(null);
     saveRound(data);
     setView('dashboard');
   }, [saveRound]);
-
   const loadNow = useCallback((data) => {
     setTransientRound(data);
     selectRound(null);
     setView('dashboard');
   }, [selectRound]);
-
   const changeRound = useCallback((id) => {
     setTransientRound(null);
     if (session?.role === 'client') clientRoundRef.current = id || null;
@@ -141,7 +133,6 @@ export default function App() {
     setSelectedSites([]);
     setSiteSearch('');
   }, []);
-
   const previousSites = useMemo(() => {
     if (transientRound || !activeRoundId || rounds.length < 2) return null;
     const ordered = [...rounds].sort(compareRounds);
@@ -159,6 +150,7 @@ export default function App() {
           role={session.role} user={session.user} view={view} onViewChange={changeView} onLogout={logout}
           mode={mode} onToggleMode={toggleMode} rounds={rounds}
           activeRoundId={transientRound ? '' : activeRoundId} onRoundChange={changeRound}
+          roundName={roundName} hasTransientRound={Boolean(transientRound)}
           dateRange={dateRange} cloudStatus={cloudStatus}
           sites={sites} selectedSites={selectedSites} onSelectedSitesChange={setSelectedSites}
           siteSearch={siteSearch} onSiteSearchChange={handleSiteSearch} onResetSiteFilters={resetSiteFilters}

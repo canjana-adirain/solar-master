@@ -12,9 +12,13 @@ import SiteFilters from './SiteFilters.jsx';
 
 export default function AppHeader({
   role, user, view, onViewChange, onLogout, mode, onToggleMode,
-  rounds, activeRoundId, onRoundChange, dateRange, cloudStatus,
+  rounds, activeRoundId, onRoundChange, roundName, hasTransientRound, dateRange, cloudStatus,
   sites = [], selectedSites = [], onSelectedSitesChange, siteSearch = '', onSiteSearchChange, onResetSiteFilters,
 }) {
+  const transientRoundValue = '__transient_round__';
+  const selectedRoundValue = hasTransientRound
+    ? transientRoundValue
+    : activeRoundId || rounds.at(-1)?.id || '';
   return (
     <AppBar position="sticky" color="transparent" elevation={0} data-no-print="true" sx={{ backdropFilter: 'blur(14px)', borderBottom: 1, borderColor: 'divider', bgcolor: (theme) => `${theme.palette.background.default}e8` }}>
       <Toolbar sx={{ minHeight: { xs: 72, md: 76 }, py: 1, px: { xs: 1.5, sm: 2.25 }, alignItems: 'center', gap: 1.5, flexWrap: { xs: 'wrap', lg: 'nowrap' } }}>
@@ -37,12 +41,15 @@ export default function AppHeader({
               <Typography sx={{ fontSize: 9.5, color: '#cfe0ff', textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 800, lineHeight: 1.2 }}>Round</Typography>
               <FormControl fullWidth size="small" variant="standard">
                 <Select
-                  disableUnderline displayEmpty value={activeRoundId || ''}
+                  disableUnderline displayEmpty value={selectedRoundValue}
                   onChange={(event) => onRoundChange(event.target.value || null)}
-                  renderValue={(value) => rounds.find((round) => round.id === value)?.name || 'Built-in sample dataset'}
+                  renderValue={(value) => value === transientRoundValue
+                    ? roundName
+                    : rounds.find((round) => round.id === value)?.name || roundName}
                   sx={{ color: '#fff', fontWeight: 900, fontSize: 13, lineHeight: 1.2, '& .MuiSelect-icon': { color: '#fff' }, '& .MuiSelect-select': { py: 0.15, pr: 3 } }}
                 >
-                  <MenuItem value=""><em>Built-in sample dataset</em></MenuItem>
+                  {hasTransientRound && <MenuItem value={transientRoundValue} disabled>{roundName}</MenuItem>}
+                  {!rounds.length && !hasTransientRound && <MenuItem value=""><em>Built-in sample dataset</em></MenuItem>}
                   {rounds.map((round) => <MenuItem key={round.id} value={round.id}>{round.name} ({round.sites.length} sites)</MenuItem>)}
                 </Select>
               </FormControl>

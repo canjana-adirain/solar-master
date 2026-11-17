@@ -8,18 +8,23 @@ function readJson(key, fallback) {
   catch { return fallback; }
 }
 
+function readRounds() {
+  const originalRounds = readJson(ROUNDS_KEY, null);
+  const savedRounds = originalRounds ?? readJson(REACT_V2_ROUNDS_KEY, []);
+  if (originalRounds == null && savedRounds.length) localStorage.setItem(ROUNDS_KEY, JSON.stringify(savedRounds));
+  return savedRounds;
+}
+
 export function useRounds(initialSites) {
-  const [rounds, setRoundsState] = useState(() => {
-    const originalRounds = readJson(ROUNDS_KEY, null);
-    const savedRounds = originalRounds ?? readJson(REACT_V2_ROUNDS_KEY, []);
-    if (originalRounds == null && savedRounds.length) localStorage.setItem(ROUNDS_KEY, JSON.stringify(savedRounds));
-    return savedRounds;
-  });
+  const [rounds, setRoundsState] = useState(readRounds);
   const [activeRoundId, setActiveRoundIdState] = useState(() => {
     const originalActive = localStorage.getItem(ACTIVE_ROUND_KEY);
     const savedActive = originalActive || localStorage.getItem(REACT_V2_ACTIVE_ROUND_KEY);
     if (!originalActive && savedActive) localStorage.setItem(ACTIVE_ROUND_KEY, savedActive);
-    return savedActive;
+    const availableRounds = readRounds();
+    return availableRounds.some((round) => round.id === savedActive)
+      ? savedActive
+      : (availableRounds.at(-1)?.id || null);
   });
   const activeRound = rounds.find((round) => round.id === activeRoundId) || null;
 
@@ -52,6 +57,7 @@ export function useRounds(initialSites) {
   const selectRound = useCallback((id) => {
     setActiveRoundIdState(id);
     if (id) localStorage.setItem(ACTIVE_ROUND_KEY, id);
+    else localStorage.removeItem(ACTIVE_ROUND_KEY);
   }, []);
 
   const replaceFromCloud = useCallback((library, cloudActiveId) => {

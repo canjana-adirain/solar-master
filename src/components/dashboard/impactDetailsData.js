@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { COLORS } from '../../constants.js';
-import { effectiveImpact, activeBreakdownIssues, activeCommunicationIssues, isResolvedBreakdown } from '../../utils/analytics.js';
+import { effectiveImpact, activeBreakdownCount, breakdownIssues, activeCommunicationIssues, isResolvedBreakdown } from '../../utils/analytics.js';
 import { exportWorkbook } from '../../utils/export.js';
 import { cleanText, formatNumber, formatPercent, safeFilename } from '../../utils/format.js';
 
@@ -18,14 +18,14 @@ export function impactValue(site, config) {
 }
 
 export function siteIssueCount(site, config) {
-  if (config === impactTypes.bd && Array.isArray(site.breakdownInverters)) return activeBreakdownIssues(site).length;
+  if (config === impactTypes.bd) return activeBreakdownCount(site);
   if (config === impactTypes.comms && Array.isArray(site.communicationIssues)) return activeCommunicationIssues(site).length;
   return Number(site[config.key]) || 0;
 }
 
 export function issueItems(site, config) {
-  if (config === impactTypes.bd && Array.isArray(site.breakdownInverters) && site.breakdownInverters.length) {
-    return site.breakdownInverters.map((item) => ({
+  if (config === impactTypes.bd) {
+    return breakdownIssues(site).map((item) => ({
       text: String(item.name || 'Inverter'),
       impact: isResolvedBreakdown(item) ? null : (Number(item.impact) > 0 ? Number(item.impact) : null),
       status: isResolvedBreakdown(item) ? 'resolved' : 'active',
@@ -45,7 +45,8 @@ export function impactSummary(sites, config) {
 }
 
 export function exportImpactExcel(sites, config) {
-  const rows = sites.flatMap((site) => {
+  const exportSites = config === impactTypes.bd ? sites.filter((site) => siteIssueCount(site, config) > 0) : sites;
+  const rows = exportSites.flatMap((site) => {
     const items = issueItems(site, config);
     return (items.length ? items : [{ text: '', impact: null }]).map(({ text, impact }) => [site.site, siteIssueCount(site, config), config.impact ? formatPercent(impactValue(site, config)) : '', text, impact == null ? '' : formatPercent(impact), site.dc || 0]);
   });
@@ -54,7 +55,8 @@ export function exportImpactExcel(sites, config) {
 
 export function exportImpactPdf(sites, config) {
   const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
-  const summary = impactSummary(sites, config);
+  const exportSites = config === impactTypes.bd ? sites.filter((site) => siteIssueCount(site, config) > 0) : sites;
+  const summary = impactSummary(exportSites, config);
   let y = 43;
   const write = (text, size = 10, bold = false) => {
     pdf.setFont('helvetica', bold ? 'bold' : 'normal'); pdf.setFontSize(size);
@@ -66,7 +68,7 @@ export function exportImpactPdf(sites, config) {
   write(`${formatNumber(summary.count)} ${config.noun} across ${summary.siteCount} sites`);
   if (config.impact) write(`Average site impact: ${formatPercent(summary.average)}   Maximum site impact: ${formatPercent(summary.max)}`);
   y += 10;
-  sites.forEach((site) => {
+  exportSites.forEach((site) => {
     if (y > 690) { pdf.addPage(); y = 43; }
     write(`${site.site} - ${formatNumber(siteIssueCount(site, config))} issue(s)${config.impact ? ` - ${formatPercent(impactValue(site, config))} impact` : ''}`, 11, true);
     const items = issueItems(site, config);
