@@ -48,7 +48,7 @@ export default function PerformanceRanking({ sites, onSiteClick }) {
               {halfBar(low)}{halfBar(high)}
             </Box>
             <Box onClick={() => high && onSiteClick(high)} role={high ? 'button' : undefined} tabIndex={high ? 0 : undefined} onKeyDown={(event) => high && (event.key === 'Enter' || event.key === ' ') && onSiteClick(high)} sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'flex-end', cursor: high ? 'pointer' : 'default', '&:hover': { color: COLORS.good }, minWidth: 0 }}>
-              <Typography variant="body2" fontWeight={700} noWrap title={high?.site}>{high?.site}</Typography>
+              <Typography variant="body2" fontWeight={700} noWrap title={high?.site} sx={{ color: COLORS.good }}>{high?.site}</Typography>
               <Typography sx={{ color: deviation(high) < 0 ? '#fb8383' : '#62e2a0', width: 52, flexShrink: 0, textAlign: 'right', fontWeight: 900 }}>{high ? signed(deviation(high)) : ''}</Typography>
             </Box>
           </Box>;
