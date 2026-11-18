@@ -26,7 +26,7 @@ export default function LoginPage({ onLogin }) {
             <Typography variant="h2" align="center">Solar Master</Typography>
             <Typography color="text.secondary" align="center" variant="body2" sx={{ mt: 0.5, mb: 2.5 }}>Sign in to access the dashboard</Typography>
             {error && <Alert severity="error" sx={{ mb: 1.75 }}>Invalid ID or password. Please try again.</Alert>}
-            <TextField fullWidth label="User ID" placeholder="admin or client" autoComplete="username" value={user} onChange={(event) => setUser(event.target.value)} sx={{ mb: 1.5 }} autoFocus />
+            <TextField fullWidth label="User ID" placeholder="Enter your user ID" autoComplete="username" value={user} onChange={(event) => setUser(event.target.value)} sx={{ mb: 1.5 }} autoFocus />
             <TextField fullWidth type="password" label="Password" placeholder="Enter your password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} sx={{ mb: 1.5 }} />
             <Button fullWidth size="large" variant="contained" type="submit" disabled={busy} startIcon={<LockOpenRoundedIcon />}>{busy ? 'Signing in…' : 'Sign In'}</Button>
             <Typography color="text.secondary" align="center" variant="caption" display="block" sx={{ mt: 2 }}>Authorized access only.</Typography>

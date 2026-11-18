@@ -8,6 +8,7 @@ export const GRADE_COLOR = { 5: COLORS.good, 4: COLORS.lime, 3: COLORS.warn, 2: 
 export const USERS = {
   admin: { hash: '9de16b0e6b275515ad537ba6597a4f453c015ddd351ffefd794c0ebf8da2b262', role: 'admin' },
   client: { hash: '712eb3fc4715eb5c5fdc162ef1ecfa47f344a9c555801fbe62bf7f21669ffd16', role: 'client' },
+  adirain: { hash: '6bafe7503e53ed587838e5539e0556fee884fcb1b941c4072c98ebab3c953af6', role: 'showcase' },
 };
 
 export const AUTH_KEY = 'solarmaster_auth_v2';

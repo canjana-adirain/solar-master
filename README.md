@@ -19,6 +19,8 @@ npm run build
 
 This project currently uses a browser-side demo login. It is not a secure administrator login: do not rely on it to protect a live Firebase Realtime Database. Set up Firebase Authentication and server-enforced Realtime Database Security Rules before connecting public builds to real data or enabling cloud writes. Review the sample dataset before making the repository public.
 
+For temporary showcases, the `adirain` login displays only the built-in sample dataset and has no upload access. This is still browser-side demo authentication, not a security boundary.
+
 The Firebase web configuration is client-visible even if moved to Vite environment variables. Do not put service account JSON, private keys, or other server secrets in this React project.
 
 ## Publish with GitHub Pages

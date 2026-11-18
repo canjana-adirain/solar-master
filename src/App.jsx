@@ -66,7 +66,7 @@ export default function App() {
   });
 
   useEffect(() => {
-    if (!session) return undefined;
+    if (!session || session.role === 'showcase') return undefined;
     setCloudStatus('live');
     return subscribeToActiveRound((remote) => {
       setCloudStatus('live');
@@ -113,7 +113,7 @@ export default function App() {
     selectRound(id);
   }, [selectRound, session?.role]);
 
-  const active = transientRound || activeRound;
+  const active = session?.role === 'showcase' ? null : transientRound || activeRound;
   const sites = active?.sites || SAMPLE_SITES;
   const roundName = active?.name || 'Built-in sample dataset';
   const dateRange = active?.dateRange || '';
@@ -148,9 +148,9 @@ export default function App() {
       <Box sx={{ minHeight: '100vh' }}>
         <AppHeader
           role={session.role} user={session.user} view={view} onViewChange={changeView} onLogout={logout}
-          mode={mode} onToggleMode={toggleMode} rounds={rounds}
-          activeRoundId={transientRound ? '' : activeRoundId} onRoundChange={changeRound}
-          roundName={roundName} hasTransientRound={Boolean(transientRound)}
+          mode={mode} onToggleMode={toggleMode} rounds={session.role === 'showcase' ? [] : rounds}
+          activeRoundId={session.role === 'showcase' || transientRound ? '' : activeRoundId} onRoundChange={changeRound}
+          roundName={roundName} hasTransientRound={session.role !== 'showcase' && Boolean(transientRound)}
           dateRange={dateRange} cloudStatus={cloudStatus}
           sites={sites} selectedSites={selectedSites} onSelectedSitesChange={setSelectedSites}
           siteSearch={siteSearch} onSiteSearchChange={handleSiteSearch} onResetSiteFilters={resetSiteFilters}
