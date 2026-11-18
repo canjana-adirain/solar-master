@@ -13,15 +13,16 @@ export default function PerformanceRanking({ sites, onSiteClick }) {
   const scale = Math.ceil(maxDeviation / 20) * 20;
   const ticks = [-scale, -scale * 2 / 3, -scale / 3, 0, scale / 3, scale * 2 / 3, scale];
   const rowCount = Math.max(bottomRows.length, top.length);
-  const halfBar = (site) => {
+  const halfBar = (site, isTop = false) => {
     if (!site) return null;
     const value = deviation(site);
     const size = Math.min(50, Math.abs(value) / scale * 50);
+    const detailColor = isTop ? COLORS.good : '#fb8383';
     return <Tooltip arrow placement="top" enterDelay={100} title={
       <Box sx={{ p: 0.3 }}>
         <Typography variant="body2" fontWeight={800}>{site.site}</Typography>
-        <Typography variant="body2" sx={{ color: '#fb8383' }}>Actual P/E: {((Number(site.ae) || 0) * 100).toFixed(1)}%</Typography>
-        <Typography variant="body2" sx={{ color: '#fb8383' }}>Deviation: {value.toFixed(1)}% vs Target {TARGET}%</Typography>
+        <Typography variant="body2" sx={{ color: detailColor }}>Actual P/E: {((Number(site.ae) || 0) * 100).toFixed(1)}%</Typography>
+        <Typography variant="body2" sx={{ color: detailColor }}>Deviation: {value.toFixed(1)}% vs Target {TARGET}%</Typography>
       </Box>
     }>
       <Box role="img" aria-label={`${site.site}: Actual P/E ${((Number(site.ae) || 0) * 100).toFixed(1)}%, deviation ${value.toFixed(1)}% from ${TARGET}% target`} sx={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', height: 12, left: value < 0 ? `${50 - size}%` : '50%', width: `${size}%`, bgcolor: value < 0 ? COLORS.bad : COLORS.good, borderRadius: '2px', minWidth: value ? 3 : 0, cursor: 'help', zIndex: 1 }} />
@@ -45,10 +46,11 @@ export default function PerformanceRanking({ sites, onSiteClick }) {
               <Typography variant="body2" fontWeight={700} noWrap title={low?.site}>{low?.site}</Typography>
             </Box>
             <Box sx={{ position: 'relative', height: 26, backgroundImage: 'linear-gradient(to right, transparent calc(50% - 1px), #dce7f3 calc(50% - 1px), #dce7f3 calc(50% + 1px), transparent calc(50% + 1px))', borderBottom: '1px solid rgba(130,150,180,.1)' }}>
-              {halfBar(low)}{halfBar(high)}
+              {halfBar(low)}{halfBar(high, true)}
             </Box>
             <Box onClick={() => high && onSiteClick(high)} role={high ? 'button' : undefined} tabIndex={high ? 0 : undefined} onKeyDown={(event) => high && (event.key === 'Enter' || event.key === ' ') && onSiteClick(high)} sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'flex-end', cursor: high ? 'pointer' : 'default', '&:hover': { color: COLORS.good }, minWidth: 0 }}>
-              <Typography variant="body2" fontWeight={700} noWrap title={high?.site} sx={{ color: COLORS.good }}>{high?.site}</Typography>
+              {/* <Typography variant="body2" fontWeight={700} noWrap title={high?.site} sx={{ color: COLORS.good }}>{high?.site}</Typography> */}
+                           <Typography variant="body2" fontWeight={700} noWrap title={high?.site}>{high?.site}</Typography>
               <Typography sx={{ color: deviation(high) < 0 ? '#fb8383' : '#62e2a0', width: 52, flexShrink: 0, textAlign: 'right', fontWeight: 900 }}>{high ? signed(deviation(high)) : ''}</Typography>
             </Box>
           </Box>;
